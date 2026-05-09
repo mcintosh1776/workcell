@@ -38,7 +38,7 @@ Recommended shape:
 - Ubuntu LTS
 - amd64
 - at least 4 GB RAM
-- at least 80 GB disk
+- at least 40 GB disk for fake and first backend smokes
 - private SSH access
 - public Workcell API disabled
 
@@ -72,13 +72,19 @@ Create a Hetzner Cloud server named `workcell-lab-001`.
 Suggested starting size:
 
 ```text
-cpx21 or cpx31
+cx23
 ```
+
+The first lab host used `cx23`: 2 vCPU, 4 GB RAM, and 40 GB disk. If Incus
+or real build workloads outgrow that shape, rebuild the disposable host as a
+larger instance instead of tuning Gondor.
 
 Use the normal operator SSH key. Keep firewall exposure minimal:
 
 - SSH from trusted operator IPs or private access path
 - no public Workcell API port
+- no broad `0.0.0.0/0` SSH rule unless it is an explicit temporary recovery
+  exception
 
 ### 2. Install Base Packages
 

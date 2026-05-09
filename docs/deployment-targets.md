@@ -18,7 +18,8 @@ Recommended first host shape:
 - Ubuntu LTS
 - amd64
 - at least 4 GB RAM
-- at least 80 GB disk if running real build jobs
+- at least 40 GB disk for fake and first backend smokes
+- at least 80 GB disk if running larger real build jobs
 - private SSH access only
 - no public Workcell API until auth, rate limits, and network policy are real
 
