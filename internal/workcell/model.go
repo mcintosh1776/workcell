@@ -72,5 +72,9 @@ func DefaultProfiles() map[string]Profile {
 			ID:      "fake",
 			Backend: "fake",
 		},
+		"podman-smoke": {
+			ID:      "podman-smoke",
+			Backend: "podman",
+		},
 	}
 }
