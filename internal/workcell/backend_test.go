@@ -475,7 +475,6 @@ func TestImageTrustModel_Documented(t *testing.T) {
 	// - Image trust enforcement is out of scope
 	// - Trust must be handled at registry or policy layer
 	
-	backend := NewPodmanBackend()
 	profile := Profile{
 		ID:      "podman-test",
 		Backend: "podman",
