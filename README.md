@@ -38,7 +38,6 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 
 - not a CI replacement
 - not Kubernetes
-- not an ARX-specific subsystem
 - not a multi-cloud provisioner
 - not a public untrusted-code platform in v0.1
 
