@@ -44,10 +44,13 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 
 ## Documentation
 
+- [Build and lab setup](BUILD.md)
 - [Product brief](docs/product-brief.md)
 - [Architecture](docs/architecture.md)
 - [Deployment targets](docs/deployment-targets.md)
 - [Lab host bootstrap](docs/lab-host-bootstrap.md)
+- [Lab host lifecycle](docs/lab-host-lifecycle.md)
+- [Cost guardrails](docs/cost-guardrails.md)
 - [Security model](docs/security-model.md)
 - [Threat model](docs/threat-model.md)
 - [API](docs/api.md)
@@ -57,6 +60,7 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 - [Bot review plan](docs/bot-review-plan.md)
 - [Steve build plan](docs/steve-build-plan.md)
 - [Steve kickoff task](docs/steve-kickoff-task.md)
+- [Steve Podman backend task](docs/steve-podman-backend-task.md)
 
 ## Current development baseline
 

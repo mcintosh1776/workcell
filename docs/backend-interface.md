@@ -41,6 +41,10 @@ Destroy(handle) -> cleanupResult
 Inspect(handle) -> backendStatus
 ```
 
+The fake backend, Podman backend, and Incus backend must all satisfy this same
+shape. Backend-specific code should not leak into the CLI command parser or API
+route handlers.
+
 ## Required behavior
 
 Every backend must:
@@ -84,6 +88,8 @@ Required:
 - collect logs
 - copy artifacts
 - remove container
+- prove command success and failure with `podman-smoke`
+- report cleanup failure instead of hiding it
 
 Deferred:
 
@@ -92,3 +98,5 @@ Deferred:
 - Docker socket mounting
 - host networking by default
 
+See [Implementation Slice 002](implementation-slices/002-podman-backend.md) for
+the first bounded Podman implementation task.

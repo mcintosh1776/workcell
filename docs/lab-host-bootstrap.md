@@ -86,6 +86,14 @@ Use the normal operator SSH key. Keep firewall exposure minimal:
 - no broad `0.0.0.0/0` SSH rule unless it is an explicit temporary recovery
   exception
 
+If using Hetzner, the guarded helper can create the host and firewall:
+
+```bash
+WORKCELL_LAB_SSH_KEY_ID=<hetzner-ssh-key-id> \
+WORKCELL_LAB_SSH_SOURCE_CIDR=<your-ip>/32 \
+scripts/provision-hetzner-lab-host.sh --yes
+```
+
 ### 2. Install Base Packages
 
 On the lab host:
