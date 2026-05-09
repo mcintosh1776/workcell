@@ -62,6 +62,8 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 - [Steve kickoff task](docs/steve-kickoff-task.md)
 - [Steve Podman backend task](docs/steve-podman-backend-task.md)
 
+Current bot handoffs live under [docs/bot-handoffs](docs/bot-handoffs).
+
 ## Current development baseline
 
 Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,

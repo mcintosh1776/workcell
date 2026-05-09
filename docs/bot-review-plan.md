@@ -67,6 +67,14 @@ Reviews Steve PRs and checks whether implementation evidence matches the spec.
    write scope.
 5. Sentinel reviews implementation PRs.
 
+## Current handoffs
+
+- Steve: `docs/bot-handoffs/steve-podman-implementation.md`
+- Linus: `docs/bot-handoffs/linus-podman-review.md`
+- Iris: `docs/bot-handoffs/iris-build-cli-review.md`
+- Inspector: `docs/bot-handoffs/inspector-podman-test-review.md`
+- Sentinel: `docs/bot-handoffs/sentinel-podman-security-review.md`
+
 ## Reviewer output format
 
 Each review should return:
