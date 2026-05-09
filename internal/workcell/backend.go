@@ -129,111 +129,105 @@ func effectiveDeadline(ctx context.Context, profile Profile) (context.Context, c
 }
 
 func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
-	if len(job.Command) == 0 {
-		return 1, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("no command")}
-	}
-
-	// Get image from profile config, fallback to default
-	image := profile.BackendConfig.Image
-	if image == "" {
-		image = "docker.io/library/alpine:3.20"
-	}
-
-	// Sanitize container name
 	containerName, err := sanitizeContainerName(job.ID)
 	if err != nil {
-		return 1, "", "", &BackendError{Op: "sanitize", Err: fmt.Errorf("invalid job ID for container name: %w", err)}
+		return 0, "", "", &BackendError{Op: "sanitize", Err: err}
 	}
 
-	// Apply the stricter effective deadline between caller context and profile timeout
+	// Apply effective deadline combining caller context and profile timeout
 	ctx, cancel := effectiveDeadline(ctx, profile)
 	defer cancel()
 
 	// Build podman run command
-	args := []string{
-		"run",
-		"--rm",
-		"--name", containerName,
-		image,
+	args := []string{"run", "--rm", "--name", containerName}
+	if profile.BackendConfig.Timeout > 0 {
+		// Add a podman timeout as well for extra safety
+		args = append(args, "--stop-timeout", fmt.Sprintf("%d", profile.BackendConfig.Timeout))
 	}
+	args = append(args, profile.BackendConfig.Image)
 	args = append(args, job.Command...)
 
 	cmd := exec.CommandContext(ctx, "podman", args...)
 
-	// Capture stdout and stderr separately
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return 1, "", "", &BackendError{Op: "stdout pipe", Err: err}
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return 1, "", "", &BackendError{Op: "stderr pipe", Err: err}
-	}
-
-	if err := cmd.Start(); err != nil {
-		return 1, "", "", &BackendError{Op: "start", Err: err}
-	}
-
-	// Read stdout and stderr concurrently to avoid blocking
+	// Capture stdout and stderr
 	var stdoutBuf, stderrBuf strings.Builder
-	var wg sync.WaitGroup
-	wg.Add(2)
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
 
-	go func() {
-		defer wg.Done()
-		io.Copy(&stdoutBuf, stdoutPipe)
-	}()
-	go func() {
-		defer wg.Done()
-		io.Copy(&stderrBuf, stderrPipe)
-	}()
+	err = cmd.Run()
 
-	// Wait for command completion or context cancellation
-	waitErr := cmd.Wait()
-	wg.Wait()
+	// Deterministic cleanup: always try to remove container after run
+	// This handles cases where the context was cancelled or process was killed
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
+	
+	// Force remove the container to ensure no orphans
+	_ = b.forceRemoveContainer(cleanupCtx, containerName)
 
-	stdout := stdoutBuf.String()
-	stderr := stderrBuf.String()
-
-	if waitErr != nil {
-		// Check if this was a context cancellation/timeout
-		if ctx.Err() != nil {
-			// Ensure cleanup runs deterministically even on timeout/cancel
-			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cleanupCancel()
-			_ = b.Cleanup(cleanupCtx, job, profile)
-			return 1, stdout, stderr, &BackendError{Op: "run", Err: fmt.Errorf("context cancelled: %w", ctx.Err())}
+	if err != nil {
+		// Check if it's an exit error (command failed) or infrastructure error
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// Command ran but exited non-zero - this is not a backend error
+			return exitErr.ExitCode(), stdoutBuf.String(), stderrBuf.String(), nil
 		}
-
-		// Check for exit code
-		if exitErr, ok := waitErr.(*exec.ExitError); ok {
-			return exitErr.ExitCode(), stdout, stderr, nil
-		}
-		return 1, stdout, stderr, &BackendError{Op: "run", Err: waitErr}
+		// Infrastructure error (e.g., podman not found, image pull failed)
+		return 0, stdoutBuf.String(), stderrBuf.String(), &BackendError{Op: "run", Err: err}
 	}
 
-	return 0, stdout, stderr, nil
+	return 0, stdoutBuf.String(), stderrBuf.String(), nil
 }
 
-// Cleanup removes the container created for the job.
-// This method runs podman rm -f to ensure deterministic cleanup.
-// Returns an error if cleanup fails; callers should not treat failed cleanup as complete.
+// forceRemoveContainer forcefully removes a container, ignoring most errors.
+// Used for deterministic cleanup after run.
+func (b *PodmanBackend) forceRemoveContainer(ctx context.Context, containerName string) error {
+	// Try to stop first (ignore errors - container might not exist or already stopped)
+	_ = b.containerStop(ctx, containerName)
+	// Then remove (ignore errors - container might not exist)
+	_ = b.containerRm(ctx, containerName)
+	return nil
+}
+
+// Cleanup performs thorough cleanup and returns error if any step fails.
+// Callers should not treat failed cleanup as complete.
 func (b *PodmanBackend) Cleanup(ctx context.Context, job Job, profile Profile) error {
 	containerName, err := sanitizeContainerName(job.ID)
 	if err != nil {
-		return fmt.Errorf("cleanup: invalid job ID: %w", err)
+		return fmt.Errorf("cleanup sanitize failed: %w", err)
 	}
 
-	// Use -f to force removal and -v to remove volumes
-	cmd := exec.CommandContext(ctx, "podman", "rm", "-f", "-v", containerName)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// Check if container doesn't exist (already cleaned up or never created)
-		if strings.Contains(string(out), "no such container") ||
-			strings.Contains(string(out), "does not exist") {
-			return nil
+	var cleanupErrors []error
+
+	// Try graceful stop first
+	if err := b.containerStop(ctx, containerName); err != nil {
+		// If stop fails, try kill
+		if killErr := b.containerKill(ctx, containerName); killErr != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop failed (%v) and kill failed (%v)", err, killErr))
 		}
-		return fmt.Errorf("cleanup failed: %w (output: %s)", err, string(out))
+	}
+
+	// Remove the container
+	if err := b.containerRm(ctx, containerName); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("rm failed: %w", err))
+	}
+
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("cleanup incomplete: %v", cleanupErrors)
 	}
 	return nil
+}
+
+func (b *PodmanBackend) containerStop(ctx context.Context, containerName string) error {
+	cmd := exec.CommandContext(ctx, "podman", "stop", "-t", "10", containerName)
+	return cmd.Run()
+}
+
+func (b *PodmanBackend) containerKill(ctx context.Context, containerName string) error {
+	cmd := exec.CommandContext(ctx, "podman", "kill", containerName)
+	return cmd.Run()
+}
+
+func (b *PodmanBackend) containerRm(ctx context.Context, containerName string) error {
+	cmd := exec.CommandContext(ctx, "podman", "rm", "-f", containerName)
+	return cmd.Run()
 }
