@@ -1,0 +1,14 @@
+profiles:
+  fake:
+    backend: fake
+    description: In-process backend used for CLI, API, and test harness development.
+
+  podman-smoke:
+    backend: podman
+    image: docker.io/library/alpine:3.20
+    timeoutSeconds: 300
+
+  incus-smoke:
+    backend: incus
+    image: images:ubuntu/24.04
+    timeoutSeconds: 900

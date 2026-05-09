@@ -28,6 +28,7 @@ is introduced.
 
 - real Incus execution
 - real Podman execution
+- Hetzner provisioning
 - web UI
 - cloud provisioning
 - multi-node scheduling
@@ -62,6 +63,20 @@ Expected behavior:
 - Public API shape matches `docs/api.md` unless the spec is updated first.
 - No ARX-specific names, paths, or assumptions appear in implementation code.
 
+## Current Implementation Note
+
+The repo now has a Go skeleton for this slice:
+
+- `cmd/workcell` owns the CLI and minimal HTTP API entrypoint.
+- `internal/workcell` owns the job model, profile model, fake backend behavior,
+  and in-memory runner.
+- `config/profiles.example.yaml` documents the future profile shape.
+- `scripts/dev-smoke.sh` is the local proof command for slice 001.
+
+Podman and Incus remain intentionally unimplemented until slices 003 and 004.
+The first real deployment target is a single Ubuntu VPS on Hetzner, but this
+slice must not encode Hetzner-specific behavior.
+
 ## Suggested Split
 
 Steve should own:
@@ -86,4 +101,3 @@ Before implementation starts, incorporate must-fix feedback from:
 - `docs/reviews/iris-cli-api-docs-review.md`
 - `docs/reviews/inspector-test-strategy-review.md`
 - `docs/reviews/sentinel-security-threat-model-review.md`
-

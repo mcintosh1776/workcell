@@ -46,6 +46,7 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 
 - [Product brief](docs/product-brief.md)
 - [Architecture](docs/architecture.md)
+- [Deployment targets](docs/deployment-targets.md)
 - [Security model](docs/security-model.md)
 - [Threat model](docs/threat-model.md)
 - [API](docs/api.md)
@@ -54,4 +55,26 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 - [Test strategy](docs/test-strategy.md)
 - [Bot review plan](docs/bot-review-plan.md)
 - [Steve build plan](docs/steve-build-plan.md)
+- [Steve kickoff task](docs/steve-kickoff-task.md)
 
+## Current development baseline
+
+Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,
+which exists to prove the job model, command validation, API shape, and test
+harness before Podman or Incus are wired in.
+
+Prerequisites:
+
+- Go 1.22 or newer
+- `jq` for `scripts/dev-smoke.sh`
+
+```bash
+go test ./...
+go run ./cmd/workcell run --profile fake -- echo hello
+```
+
+For a local smoke:
+
+```bash
+scripts/dev-smoke.sh
+```
