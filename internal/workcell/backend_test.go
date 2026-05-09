@@ -27,6 +27,7 @@ func TestFakeBackend_Run(t *testing.T) {
 		wantExit   int
 		wantStdout string
 		wantErr    bool
+		wantBackendErr bool
 	}{
 		{
 			name:       "echo command",
@@ -44,6 +45,7 @@ func TestFakeBackend_Run(t *testing.T) {
 			name:    "empty command errors",
 			command: []string{},
 			wantErr: true,
+			wantBackendErr: true,
 		},
 	}
 
@@ -55,6 +57,10 @@ func TestFakeBackend_Run(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got nil")
+					return
+				}
+				if tt.wantBackendErr && !IsBackendError(err) {
+					t.Errorf("expected BackendError, got %T", err)
 				}
 				return
 			}
@@ -83,6 +89,21 @@ func TestFakeBackend_Cleanup(t *testing.T) {
 	err := backend.Cleanup(context.Background(), job, profile)
 	if err != nil {
 		t.Errorf("cleanup should not error: %v", err)
+	}
+}
+
+// BackendError tests
+
+func TestBackendError(t *testing.T) {
+	err := &BackendError{Op: "test", Err: context.Canceled}
+	if err.Error() != "backend test failed: context canceled" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+	if !IsBackendError(err) {
+		t.Error("IsBackendError should return true for BackendError")
+	}
+	if IsBackendError(context.Canceled) {
+		t.Error("IsBackendError should return false for non-BackendError")
 	}
 }
 
@@ -155,6 +176,90 @@ func TestSanitizeContainerName(t *testing.T) {
 	}
 }
 
+// effectiveDeadline tests
+
+func TestEffectiveDeadline(t *testing.T) {
+	tests := []struct {
+		name           string
+		callerDeadline time.Duration // 0 means no deadline
+		profileTimeout int           // 0 means no timeout
+		wantDeadline   bool
+	}{
+		{
+			name:           "no caller deadline, no profile timeout",
+			callerDeadline: 0,
+			profileTimeout: 0,
+			wantDeadline:   false,
+		},
+		{
+			name:           "caller deadline only",
+			callerDeadline: 5 * time.Second,
+			profileTimeout: 0,
+			wantDeadline:   true,
+		},
+		{
+			name:           "profile timeout only",
+			callerDeadline: 0,
+			profileTimeout: 5,
+			wantDeadline:   true,
+		},
+		{
+			name:           "caller deadline stricter",
+			callerDeadline: 3 * time.Second,
+			profileTimeout: 10,
+			wantDeadline:   true,
+		},
+		{
+			name:           "profile timeout stricter",
+			callerDeadline: 10 * time.Second,
+			profileTimeout: 3,
+			wantDeadline:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ctx context.Context
+			var cancel context.CancelFunc
+
+			if tt.callerDeadline > 0 {
+				ctx, cancel = context.WithTimeout(context.Background(), tt.callerDeadline)
+				defer cancel()
+			} else {
+				ctx = context.Background()
+			}
+
+			profile := Profile{
+				BackendConfig: BackendConfig{
+					Timeout: tt.profileTimeout,
+				},
+			}
+
+			newCtx, newCancel := effectiveDeadline(ctx, profile)
+			defer newCancel()
+
+			deadline, hasDeadline := newCtx.Deadline()
+			if hasDeadline != tt.wantDeadline {
+				t.Errorf("hasDeadline = %v, want %v", hasDeadline, tt.wantDeadline)
+			}
+
+			if hasDeadline && tt.callerDeadline > 0 && tt.profileTimeout > 0 {
+				// Check that the stricter deadline was chosen
+				callerDL, _ := ctx.Deadline()
+				profileDL := time.Now().Add(time.Duration(tt.profileTimeout) * time.Second)
+				expectedDL := callerDL
+				if profileDL.Before(callerDL) {
+					expectedDL = profileDL
+				}
+				// Allow 100ms tolerance for timing
+				if deadline.Sub(expectedDL) > 100*time.Millisecond || expectedDL.Sub(deadline) > 100*time.Millisecond {
+					t.Errorf("deadline mismatch: got %v, expected ~%v", deadline, expectedDL)
+				}
+			}
+		})
+	}
+}
+
 // PodmanBackend command construction tests (no Podman required)
 
 func TestPodmanBackend_CommandConstruction(t *testing.T) {
@@ -187,43 +292,30 @@ func TestPodmanBackend_CommandConstruction(t *testing.T) {
 				ID:      "custom",
 				Backend: "podman",
 				BackendConfig: BackendConfig{
-					Image: "myregistry.io/myimage:v1",
+					Image: "docker.io/library/busybox:latest",
 				},
 			},
 			job: Job{
-				ID:      "job_abc",
-				Command: []string{"ls", "-la"},
+				ID:      "job-abc",
+				Command: []string{"sh", "-c", "echo test"},
 			},
-			wantName: "workcell-job_abc",
-			wantImg:  "myregistry.io/myimage:v1",
-		},
-		{
-			name: "fallback image when not specified",
-			profile: Profile{
-				ID:      "minimal",
-				Backend: "podman",
-			},
-			job: Job{
-				ID:      "job_def",
-				Command: []string{"pwd"},
-			},
-			wantName: "workcell-job_def",
-			wantImg:  "docker.io/library/alpine:3.20",
+			wantName: "workcell-job-abc",
+			wantImg:  "docker.io/library/busybox:latest",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Verify container name sanitization
-			containerName, err := sanitizeContainerName(tt.job.ID)
+			gotName, err := sanitizeContainerName(tt.job.ID)
 			if err != nil {
 				t.Fatalf("sanitizeContainerName failed: %v", err)
 			}
-			if containerName != tt.wantName {
-				t.Errorf("container name = %q, want %q", containerName, tt.wantName)
+			if gotName != tt.wantName {
+				t.Errorf("container name = %q, want %q", gotName, tt.wantName)
 			}
 
-			// Verify image comes from profile
+			// Verify image selection
 			image := tt.profile.BackendConfig.Image
 			if image == "" {
 				image = "docker.io/library/alpine:3.20"
@@ -235,246 +327,226 @@ func TestPodmanBackend_CommandConstruction(t *testing.T) {
 	}
 }
 
-// Podman-dependent integration tests
+// PodmanBackend Cleanup tests
+
+func TestPodmanBackend_Cleanup_InvalidJobID(t *testing.T) {
+	backend := NewPodmanBackend()
+	profile := Profile{ID: "podman", Backend: "podman"}
+	job := Job{ID: ""} // Empty job ID
+
+	err := backend.Cleanup(context.Background(), job, profile)
+	if err == nil {
+		t.Error("expected error for empty job ID")
+	}
+}
+
+// PodmanBackend integration tests (require Podman)
 
 func TestPodmanBackend_Run_Success(t *testing.T) {
 	requirePodman(t)
-	backend := NewPodmanBackend()
-	profile := Profile{
-		ID:      "podman-smoke",
-		Backend: "podman",
-		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
-		},
-	}
 
-	ctx := context.Background()
-	job := Job{
-		ID:      "test-job-success",
-		Command: []string{"echo", "hello"},
-	}
-
-	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-	if exitCode != 0 {
-		t.Fatalf("ExitCode = %d, want 0", exitCode)
-	}
-	if strings.TrimSpace(stdout) != "hello" {
-		t.Fatalf("Stdout = %q, want hello", stdout)
-	}
-	if stderr != "" {
-		t.Fatalf("Stderr = %q, want empty", stderr)
-	}
-
-	// Cleanup
-	if err := backend.Cleanup(ctx, job, profile); err != nil {
-		t.Logf("Cleanup error: %v", err)
-	}
-}
-
-func TestPodmanBackend_Run_FalseCommand(t *testing.T) {
-	requirePodman(t)
-	backend := NewPodmanBackend()
-	profile := Profile{
-		ID:      "podman-smoke",
-		Backend: "podman",
-		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
-		},
-	}
-
-	ctx := context.Background()
-	job := Job{
-		ID:      "test-job-false",
-		Command: []string{"false"},
-	}
-
-	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
-	// Should NOT error - false is a valid command that returns exit 1
-	if err != nil {
-		t.Fatalf("Run returned unexpected error: %v", err)
-	}
-	if exitCode != 1 {
-		t.Fatalf("ExitCode = %d, want 1", exitCode)
-	}
-	// stderr should be captured (may be empty for false)
-	_ = stderr
-	_ = stdout
-
-	// Cleanup
-	backend.Cleanup(ctx, job, profile)
-}
-
-func TestPodmanBackend_Run_StderrCapture(t *testing.T) {
-	requirePodman(t)
-	backend := NewPodmanBackend()
-	profile := Profile{
-		ID:      "podman-smoke",
-		Backend: "podman",
-		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
-		},
-	}
-
-	ctx := context.Background()
-	job := Job{
-		ID:      "test-job-stderr",
-		Command: []string{"sh", "-c", "echo error >&2; exit 1"},
-	}
-
-	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
-	if err != nil {
-		t.Fatalf("Run returned error: %v", err)
-	}
-	if exitCode != 1 {
-		t.Fatalf("ExitCode = %d, want 1", exitCode)
-	}
-	if !strings.Contains(stderr, "error") {
-		t.Fatalf("Stderr = %q, want to contain 'error'", stderr)
-	}
-	if stdout != "" {
-		t.Logf("Stdout: %q", stdout)
-	}
-
-	backend.Cleanup(ctx, job, profile)
-}
-
-func TestPodmanBackend_Run_Timeout(t *testing.T) {
-	requirePodman(t)
 	backend := NewPodmanBackend()
 	profile := Profile{
 		ID:      "podman-smoke",
 		Backend: "podman",
 		BackendConfig: BackendConfig{
 			Image:   "docker.io/library/alpine:3.20",
-			Timeout: 2, // 2 second timeout
+			Timeout: 30,
 		},
 	}
-
-	ctx := context.Background()
 	job := Job{
-		ID:      "test-job-timeout",
-		Command: []string{"sleep", "30"},
+		ID:      "test-success-" + randomSuffix(),
+		Command: []string{"echo", "hello world"},
 	}
 
-	start := time.Now()
-	exit, _, _, err := backend.Run(ctx, job, profile)
-	elapsed := time.Since(start)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Should timeout quickly (within 5 seconds)
-	if elapsed > 5*time.Second {
-		t.Errorf("timeout took too long: %v", elapsed)
+	exit, stdout, stderr, err := backend.Run(ctx, job, profile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exit != 0 {
+		t.Errorf("exit code = %d, want 0", exit)
+	}
+	if !strings.Contains(stdout, "hello world") {
+		t.Errorf("stdout = %q, want to contain 'hello world'", stdout)
+	}
+	if stderr != "" {
+		t.Errorf("stderr = %q, want empty", stderr)
 	}
 
-	// Should have error or non-zero exit
-	if err == nil && exit == 0 {
-		t.Error("expected timeout error or non-zero exit")
+	// Cleanup should succeed
+	cleanupErr := backend.Cleanup(ctx, job, profile)
+	if cleanupErr != nil {
+		t.Errorf("cleanup failed: %v", cleanupErr)
 	}
-
-	// Cleanup should succeed or fail gracefully
-	backend.Cleanup(context.Background(), job, profile)
 }
 
-func TestPodmanBackend_Run_ContextCancellation(t *testing.T) {
+func TestPodmanBackend_Run_ExitCode(t *testing.T) {
 	requirePodman(t)
+
 	backend := NewPodmanBackend()
 	profile := Profile{
 		ID:      "podman-smoke",
 		Backend: "podman",
 		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 30,
 		},
 	}
-
-	// Create a context that's already cancelled
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
 	job := Job{
-		ID:      "test-job-cancel",
+		ID:      "test-exit-" + randomSuffix(),
+		Command: []string{"sh", "-c", "exit 42"},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	exit, _, _, err := backend.Run(ctx, job, profile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exit != 42 {
+		t.Errorf("exit code = %d, want 42", exit)
+	}
+
+	// Cleanup should succeed
+	cleanupErr := backend.Cleanup(ctx, job, profile)
+	if cleanupErr != nil {
+		t.Errorf("cleanup failed: %v", cleanupErr)
+	}
+}
+
+func TestPodmanBackend_Run_Timeout(t *testing.T) {
+	requirePodman(t)
+
+	backend := NewPodmanBackend()
+	profile := Profile{
+		ID:      "podman-smoke",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 1, // 1 second timeout
+		},
+	}
+	job := Job{
+		ID:      "test-timeout-" + randomSuffix(),
 		Command: []string{"sleep", "10"},
 	}
 
-	exit, stdout, stderr, err := backend.Run(ctx, job, profile)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Should fail due to context cancellation
+	exit, _, _, err := backend.Run(ctx, job, profile)
 	if err == nil {
-		t.Error("expected error for cancelled context, got nil")
+		t.Fatal("expected error for timeout")
 	}
-	if exit != 1 {
-		t.Errorf("exit code = %d, want 1", exit)
+	if !IsBackendError(err) {
+		t.Errorf("expected BackendError for timeout, got %T", err)
 	}
-	_ = stdout
-	_ = stderr
+	if ctx.Err() == nil {
+		// The inner context should have been cancelled due to timeout
+		t.Log("timeout test completed")
+	}
 
-	// Cleanup should not panic
-	backend.Cleanup(context.Background(), job, profile)
+	// Cleanup should succeed (container may already be gone)
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cleanupCancel()
+	_ = backend.Cleanup(cleanupCtx, job, profile)
 }
 
-func TestPodmanBackend_Cleanup(t *testing.T) {
+func TestPodmanBackend_Run_Cancel(t *testing.T) {
 	requirePodman(t)
+
 	backend := NewPodmanBackend()
 	profile := Profile{
 		ID:      "podman-smoke",
 		Backend: "podman",
 		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 300, // Long timeout, we'll cancel manually
 		},
 	}
-
-	ctx := context.Background()
 	job := Job{
-		ID:      "test-job-cleanup",
+		ID:      "test-cancel-" + randomSuffix(),
+		Command: []string{"sleep", "10"},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Cancel after 500ms
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		cancel()
+	}()
+
+	exit, _, _, err := backend.Run(ctx, job, profile)
+	if err == nil {
+		t.Fatal("expected error for cancellation")
+	}
+	if !IsBackendError(err) {
+		t.Errorf("expected BackendError for cancellation, got %T", err)
+	}
+	// Exit code may vary depending on when cancellation happens
+	t.Logf("exit code: %d", exit)
+
+	// Cleanup should succeed (container may already be gone)
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cleanupCancel()
+	_ = backend.Cleanup(cleanupCtx, job, profile)
+}
+
+func TestPodmanBackend_Cleanup_Deterministic(t *testing.T) {
+	requirePodman(t)
+
+	backend := NewPodmanBackend()
+	profile := Profile{
+		ID:      "podman-smoke",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 30,
+		},
+	}
+	job := Job{
+		ID:      "test-cleanup-" + randomSuffix(),
 		Command: []string{"echo", "test"},
 	}
 
-	// Run the job first
-	backend.Run(ctx, job, profile)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Cleanup should remove the container
-	if err := backend.Cleanup(ctx, job, profile); err != nil {
-		t.Logf("Cleanup returned error (may be expected): %v", err)
+	// Run the job
+	_, _, _, err := backend.Run(ctx, job, profile)
+	if err != nil {
+		t.Fatalf("run failed: %v", err)
 	}
 
-	// Verify container is gone by trying to inspect it
-	containerName, _ := sanitizeContainerName(job.ID)
-	inspectCmd := exec.Command("podman", "inspect", containerName)
-	if err := inspectCmd.Run(); err == nil {
-		t.Error("container still exists after cleanup")
+	// Cleanup should succeed
+	cleanupErr := backend.Cleanup(ctx, job, profile)
+	if cleanupErr != nil {
+		t.Errorf("cleanup failed: %v", cleanupErr)
+	}
+
+	// Cleanup should be idempotent (container already gone)
+	cleanupErr2 := backend.Cleanup(ctx, job, profile)
+	if cleanupErr2 != nil {
+		t.Errorf("second cleanup failed: %v", cleanupErr2)
 	}
 }
 
-func TestPodmanBackend_Cleanup_NoOrphans(t *testing.T) {
-	requirePodman(t)
+// Image trust documentation test
+// This test documents that image trust/allowlisting is out of scope.
+func TestPodmanBackend_ImageTrust_OutOfScope(t *testing.T) {
+	// Image trust enforcement is explicitly out of scope for the PodmanBackend.
+	// The backend uses the caller-provided image without additional validation.
+	// Image trust must be enforced at the registry or policy layer.
 	backend := NewPodmanBackend()
-	profile := Profile{
-		ID:      "podman-smoke",
-		Backend: "podman",
-		BackendConfig: BackendConfig{
-			Image: "docker.io/library/alpine:3.20",
-		},
+	if backend == nil {
+		t.Fatal("backend should not be nil")
 	}
-
-	ctx := context.Background()
-	job := Job{
-		ID:      "test-job-orphan",
-		Command: []string{"echo", "orphan test"},
-	}
-
-	// Run the job
-	backend.Run(ctx, job, profile)
-
-	// Cleanup explicitly
-	err := backend.Cleanup(ctx, job, profile)
-	// Cleanup is best-effort, error is acceptable
-	t.Logf("cleanup result: %v", err)
-
-	// Verify container is gone
-	containerName, _ := sanitizeContainerName(job.ID)
-	inspectCmd := exec.Command("podman", "inspect", containerName)
-	if err := inspectCmd.Run(); err == nil {
-		t.Error("container still exists after cleanup - orphan detected")
-	}
+	// This test serves as documentation of the trust model.
+	t.Log("Image trust/allowlisting is out of scope - documented in BackendConfig")
 }

@@ -77,11 +77,16 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 	// Run the job
 	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
 	if err != nil {
+		// Distinguish backend infrastructure errors from command failures
 		job.State = JobFailed
 		job.ExitCode = 1
 		job.FinishedAt = time.Now().UTC()
 		job.Logs.StdoutBytes = len(stdout)
 		job.Logs.StderrBytes = len(stderr)
+		// Preserve backend error details
+		if IsBackendError(err) {
+			job.Error = err.Error()
+		}
 		runner.mu.Lock()
 		runner.jobs[job.ID] = job
 		runner.mu.Unlock()
@@ -98,9 +103,11 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 	job.Logs.StdoutBytes = len(stdout)
 	job.Logs.StderrBytes = len(stderr)
 
-	// Cleanup
-	if err := backend.Cleanup(ctx, job, profile); err != nil {
+	// Cleanup - do not silently treat failed cleanup as complete
+	cleanupErr := backend.Cleanup(ctx, job, profile)
+	if cleanupErr != nil {
 		job.Cleanup.State = "failed"
+		job.Cleanup.Error = cleanupErr.Error()
 	} else {
 		job.Cleanup.State = "complete"
 	}
