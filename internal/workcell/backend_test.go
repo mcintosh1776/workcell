@@ -347,7 +347,9 @@ func TestPodmanBackend_Run_CommandFailure(t *testing.T) {
 func TestPodmanBackend_Run_CommandFailureWithFakePodmanIsNotBackendError(t *testing.T) {
 	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
 case "$1" in
-  run) echo "command failed" >&2; exit 42 ;;
+  create) exit 0 ;;
+  start) echo "command failed" >&2; exit 42 ;;
+  inspect) echo 42; exit 0 ;;
   stop|kill|rm) exit 0 ;;
 esac
 exit 99
@@ -406,7 +408,7 @@ func TestPodmanBackend_Run_InfrastructureFailure(t *testing.T) {
 func TestPodmanBackend_Run_PodmanExit125IsBackendError(t *testing.T) {
 	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
 case "$1" in
-  run) echo "image pull failed" >&2; exit 125 ;;
+  create) echo "image pull failed" >&2; exit 125 ;;
   stop|kill|rm) echo "no such container" >&2; exit 1 ;;
 esac
 exit 99
@@ -430,6 +432,9 @@ exit 99
 	}
 	if !IsBackendError(err) {
 		t.Fatalf("expected BackendError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "image pull failed") {
+		t.Fatalf("error = %q, want image pull detail", err.Error())
 	}
 	if exit != 125 {
 		t.Fatalf("exit = %d, want 125", exit)

@@ -1,10 +1,12 @@
 package workcell
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -144,8 +146,17 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	ctx, cancel := effectiveDeadline(ctx, profile)
 	defer cancel()
 
-	// Build podman run command
-	args := []string{"run", "--rm", "--name", containerName}
+	// Build podman create command. We use create/start/inspect instead of
+	// podman run so command exit codes can be distinguished from Podman
+	// infrastructure failures.
+	args := []string{
+		"create",
+		"--name", containerName,
+		"--pull", "missing",
+		"--network", "none",
+		"--security-opt", "no-new-privileges",
+		"--user", "65532:65532",
+	}
 	if profile.BackendConfig.Timeout > 0 {
 		// Add a podman timeout as well for extra safety
 		args = append(args, "--stop-timeout", fmt.Sprintf("%d", profile.BackendConfig.Timeout))
@@ -153,14 +164,20 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	args = append(args, profile.BackendConfig.Image)
 	args = append(args, job.Command...)
 
-	cmd := b.command(ctx, args...)
+	createStdout, createStderr, err := b.runPodmanCapture(ctx, args...)
+	if err != nil {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cleanupCancel()
+		_ = b.forceRemoveContainer(cleanupCtx, containerName)
+		return podmanProcessExitCode(err), createStdout, createStderr, &BackendError{
+			Op:  "create",
+			Err: errorWithOutput(err, createStderr),
+		}
+	}
 
 	// Capture stdout and stderr
-	var stdoutBuf, stderrBuf strings.Builder
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
-
-	err = cmd.Run()
+	stdout, stderr, startErr := b.runPodmanCapture(ctx, "start", "--attach", containerName)
+	exitCode, inspected := b.inspectExitCode(ctx, containerName)
 
 	// Deterministic cleanup: always try to remove container after run
 	// This handles cases where the context was cancelled or process was killed
@@ -170,21 +187,20 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	// Force remove the container to ensure no orphans
 	_ = b.forceRemoveContainer(cleanupCtx, containerName)
 
-	if err != nil {
-		// Check if it's an exit error (command failed) or infrastructure error
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			if ctx.Err() != nil || isPodmanInfrastructureExitCode(exitErr.ExitCode()) {
-				return exitErr.ExitCode(), stdoutBuf.String(), stderrBuf.String(), &BackendError{Op: "run", Err: err}
-			}
-			// Command ran but exited non-zero - this is not a backend error.
-			return exitErr.ExitCode(), stdoutBuf.String(), stderrBuf.String(), nil
+	if startErr != nil {
+		if ctx.Err() != nil {
+			return podmanProcessExitCode(startErr), stdout, stderr, &BackendError{Op: "start", Err: errorWithOutput(ctx.Err(), stderr)}
 		}
-		// Infrastructure error (e.g., podman not found, image pull failed)
-		return 0, stdoutBuf.String(), stderrBuf.String(), &BackendError{Op: "run", Err: err}
+		if inspected {
+			return exitCode, stdout, stderr, nil
+		}
+		return podmanProcessExitCode(startErr), stdout, stderr, &BackendError{Op: "start", Err: errorWithOutput(startErr, stderr)}
 	}
 
-	return 0, stdoutBuf.String(), stderrBuf.String(), nil
+	if inspected {
+		return exitCode, stdout, stderr, nil
+	}
+	return 0, stdout, stderr, nil
 }
 
 // forceRemoveContainer forcefully removes a container, ignoring most errors.
@@ -254,11 +270,9 @@ func (b *PodmanBackend) containerRm(ctx context.Context, containerName string) e
 }
 
 func (b *PodmanBackend) runPodman(ctx context.Context, args ...string) error {
-	cmd := b.command(ctx, args...)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		detail := strings.TrimSpace(stderr.String())
+	_, stderr, err := b.runPodmanCapture(ctx, args...)
+	if err != nil {
+		detail := strings.TrimSpace(stderr)
 		if detail == "" {
 			return err
 		}
@@ -267,8 +281,41 @@ func (b *PodmanBackend) runPodman(ctx context.Context, args ...string) error {
 	return nil
 }
 
-func isPodmanInfrastructureExitCode(exitCode int) bool {
-	return exitCode == 125 || exitCode == 126 || exitCode == 127
+func (b *PodmanBackend) runPodmanCapture(ctx context.Context, args ...string) (string, string, error) {
+	cmd := b.command(ctx, args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+func (b *PodmanBackend) inspectExitCode(ctx context.Context, containerName string) (int, bool) {
+	stdout, _, err := b.runPodmanCapture(ctx, "inspect", "--format", "{{.State.ExitCode}}", containerName)
+	if err != nil {
+		return -1, false
+	}
+	exitCode, parseErr := strconv.Atoi(strings.TrimSpace(stdout))
+	if parseErr != nil {
+		return -1, false
+	}
+	return exitCode, true
+}
+
+func podmanProcessExitCode(err error) int {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return -1
+}
+
+func errorWithOutput(err error, stderr string) error {
+	detail := strings.TrimSpace(stderr)
+	if detail == "" {
+		return err
+	}
+	return fmt.Errorf("%w: %s", err, detail)
 }
 
 func isMissingContainerError(err error) bool {
