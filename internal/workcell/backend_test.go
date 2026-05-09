@@ -482,15 +482,13 @@ func TestPodmanBackend_Run_Cancel(t *testing.T) {
 		cancel()
 	}()
 
-	exit, _, _, err := backend.Run(ctx, job, profile)
+	_, _, _, err := backend.Run(ctx, job, profile)
 	if err == nil {
 		t.Fatal("expected error for cancellation")
 	}
 	if !IsBackendError(err) {
 		t.Errorf("expected BackendError for cancellation, got %T", err)
 	}
-	// Exit code may vary depending on when cancellation happens
-	t.Logf("exit code: %d", exit)
 
 	// Cleanup should succeed (container may already be gone)
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
