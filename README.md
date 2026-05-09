@@ -47,6 +47,7 @@ CLI/API -> runner daemon -> Incus or Podman workspace -> logs/artifacts -> clean
 - [Product brief](docs/product-brief.md)
 - [Architecture](docs/architecture.md)
 - [Deployment targets](docs/deployment-targets.md)
+- [Lab host bootstrap](docs/lab-host-bootstrap.md)
 - [Security model](docs/security-model.md)
 - [Threat model](docs/threat-model.md)
 - [API](docs/api.md)

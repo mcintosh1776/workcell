@@ -22,6 +22,10 @@ Recommended first host shape:
 - private SSH access only
 - no public Workcell API until auth, rate limits, and network policy are real
 
+The first disposable lab host is described in
+[Lab host bootstrap](lab-host-bootstrap.md). Gondor should remain the operator
+workstation, not the Workcell build/test runner.
+
 ## Backend Support Order
 
 ### 1. Fake Backend
