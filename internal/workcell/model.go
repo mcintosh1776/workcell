@@ -62,8 +62,14 @@ type ArtifactInfo struct {
 }
 
 type Profile struct {
-	ID      string
-	Backend string
+	ID            string
+	Backend       string
+	BackendConfig BackendConfig
+}
+
+type BackendConfig struct {
+	Image   string
+	Timeout int // seconds, 0 means no additional timeout beyond context
 }
 
 func DefaultProfiles() map[string]Profile {
@@ -75,6 +81,10 @@ func DefaultProfiles() map[string]Profile {
 		"podman-smoke": {
 			ID:      "podman-smoke",
 			Backend: "podman",
+			BackendConfig: BackendConfig{
+				Image:   "docker.io/library/alpine:3.20",
+				Timeout: 300,
+			},
 		},
 	}
 }

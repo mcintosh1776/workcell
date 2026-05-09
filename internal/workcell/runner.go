@@ -26,7 +26,7 @@ func NewRunner(profiles map[string]Profile) *Runner {
 	// Initialize backends
 	backends := make(map[string]Backend)
 	backends["fake"] = &FakeBackend{}
-	backends["podman"] = NewPodmanBackend("")
+	backends["podman"] = NewPodmanBackend()
 
 	return &Runner{
 		profiles: copied,
@@ -75,7 +75,7 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 	}
 
 	// Run the job
-	exitCode, stdout, stderr, err := backend.Run(ctx, job)
+	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
 	if err != nil {
 		job.State = JobFailed
 		job.ExitCode = 1
@@ -99,7 +99,7 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 	job.Logs.StderrBytes = len(stderr)
 
 	// Cleanup
-	if err := backend.Cleanup(ctx, job); err != nil {
+	if err := backend.Cleanup(ctx, job, profile); err != nil {
 		job.Cleanup.State = "failed"
 	} else {
 		job.Cleanup.State = "complete"
