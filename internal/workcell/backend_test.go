@@ -438,7 +438,7 @@ func TestPodmanBackend_Run_Timeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	exit, _, _, err := backend.Run(ctx, job, profile)
+	_, _, _, err := backend.Run(ctx, job, profile)
 	if err == nil {
 		t.Fatal("expected error for timeout")
 	}
