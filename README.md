@@ -79,3 +79,7 @@ For a local smoke:
 ```bash
 scripts/dev-smoke.sh
 ```
+
+For the disposable VPS lab-host path, see
+[Lab host bootstrap](docs/lab-host-bootstrap.md). Do not install the full
+Podman/Incus runner stack on Gondor just to validate Workcell.

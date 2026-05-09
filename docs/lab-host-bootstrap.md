@@ -89,6 +89,14 @@ sudo apt update
 sudo apt install -y git curl jq build-essential ca-certificates
 ```
 
+Or, after cloning Workcell, run the guarded helper:
+
+```bash
+scripts/bootstrap-ubuntu-lab-host.sh --yes
+```
+
+Do not run this helper on Gondor.
+
 ### 3. Install Go
 
 Install Go from the OS package or official tarball. The project target is:
@@ -150,6 +158,26 @@ Expected:
 workcell_dev_smoke=ok
 ```
 
+### 8. Run Lab Preflight
+
+From the Workcell checkout:
+
+```bash
+scripts/lab-host-preflight.sh
+```
+
+To include live Podman and Incus container smoke jobs:
+
+```bash
+WORKCELL_LAB_PREFLIGHT_RUN_BACKEND_SMOKES=1 scripts/lab-host-preflight.sh
+```
+
+Expected:
+
+```text
+workcell_lab_preflight=ok
+```
+
 ## Success Criteria
 
 The lab host is ready when:
@@ -160,6 +188,7 @@ The lab host is ready when:
 - Incus container smoke passes
 - Workcell `go test ./...` passes
 - Workcell `scripts/dev-smoke.sh` passes
+- Workcell `scripts/lab-host-preflight.sh` passes
 
 ## Teardown Rule
 
