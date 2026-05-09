@@ -63,10 +63,14 @@ func (b *FakeBackend) Cleanup(ctx context.Context, job Job, profile Profile) err
 // Image trust: This backend uses the caller-provided image without additional
 // allowlist validation. Image trust enforcement is out of scope for this
 // implementation and must be handled at the registry or policy layer.
-type PodmanBackend struct{}
+type PodmanBackend struct {
+	binary string
+}
+
+var podmanBinary = "podman"
 
 func NewPodmanBackend() *PodmanBackend {
-	return &PodmanBackend{}
+	return &PodmanBackend{binary: podmanBinary}
 }
 
 // sanitizeContainerName validates and sanitizes a job ID for use as a container name.
@@ -127,6 +131,10 @@ func effectiveDeadline(ctx context.Context, profile Profile) (context.Context, c
 }
 
 func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
+	if strings.TrimSpace(profile.BackendConfig.Image) == "" {
+		return 0, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("podman image is required")}
+	}
+
 	containerName, err := sanitizeContainerName(job.ID)
 	if err != nil {
 		return 0, "", "", &BackendError{Op: "sanitize", Err: err}
@@ -145,7 +153,7 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	args = append(args, profile.BackendConfig.Image)
 	args = append(args, job.Command...)
 
-	cmd := exec.CommandContext(ctx, "podman", args...)
+	cmd := b.command(ctx, args...)
 
 	// Capture stdout and stderr
 	var stdoutBuf, stderrBuf strings.Builder
@@ -158,7 +166,7 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	// This handles cases where the context was cancelled or process was killed
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cleanupCancel()
-	
+
 	// Force remove the container to ensure no orphans
 	_ = b.forceRemoveContainer(cleanupCtx, containerName)
 
@@ -166,7 +174,10 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 		// Check if it's an exit error (command failed) or infrastructure error
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			// Command ran but exited non-zero - this is not a backend error
+			if ctx.Err() != nil || isPodmanInfrastructureExitCode(exitErr.ExitCode()) {
+				return exitErr.ExitCode(), stdoutBuf.String(), stderrBuf.String(), &BackendError{Op: "run", Err: err}
+			}
+			// Command ran but exited non-zero - this is not a backend error.
 			return exitErr.ExitCode(), stdoutBuf.String(), stderrBuf.String(), nil
 		}
 		// Infrastructure error (e.g., podman not found, image pull failed)
@@ -198,15 +209,22 @@ func (b *PodmanBackend) Cleanup(ctx context.Context, job Job, profile Profile) e
 
 	// Try graceful stop first
 	if err := b.containerStop(ctx, containerName); err != nil {
+		if isMissingContainerError(err) {
+			return nil
+		}
 		// If stop fails, try kill
 		if killErr := b.containerKill(ctx, containerName); killErr != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop failed (%v) and kill failed (%v)", err, killErr))
+			if !isMissingContainerError(killErr) {
+				cleanupErrors = append(cleanupErrors, fmt.Errorf("stop failed (%v) and kill failed (%v)", err, killErr))
+			}
 		}
 	}
 
 	// Remove the container
 	if err := b.containerRm(ctx, containerName); err != nil {
-		cleanupErrors = append(cleanupErrors, fmt.Errorf("rm failed: %w", err))
+		if !isMissingContainerError(err) {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("rm failed: %w", err))
+		}
 	}
 
 	if len(cleanupErrors) > 0 {
@@ -215,17 +233,54 @@ func (b *PodmanBackend) Cleanup(ctx context.Context, job Job, profile Profile) e
 	return nil
 }
 
+func (b *PodmanBackend) command(ctx context.Context, args ...string) *exec.Cmd {
+	binary := b.binary
+	if strings.TrimSpace(binary) == "" {
+		binary = podmanBinary
+	}
+	return exec.CommandContext(ctx, binary, args...)
+}
+
 func (b *PodmanBackend) containerStop(ctx context.Context, containerName string) error {
-	cmd := exec.CommandContext(ctx, "podman", "stop", "-t", "10", containerName)
-	return cmd.Run()
+	return b.runPodman(ctx, "stop", "-t", "10", containerName)
 }
 
 func (b *PodmanBackend) containerKill(ctx context.Context, containerName string) error {
-	cmd := exec.CommandContext(ctx, "podman", "kill", containerName)
-	return cmd.Run()
+	return b.runPodman(ctx, "kill", containerName)
 }
 
 func (b *PodmanBackend) containerRm(ctx context.Context, containerName string) error {
-	cmd := exec.CommandContext(ctx, "podman", "rm", "-f", containerName)
-	return cmd.Run()
+	return b.runPodman(ctx, "rm", "-f", containerName)
+}
+
+func (b *PodmanBackend) runPodman(ctx context.Context, args ...string) error {
+	cmd := b.command(ctx, args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail == "" {
+			return err
+		}
+		return fmt.Errorf("%w: %s", err, detail)
+	}
+	return nil
+}
+
+func isPodmanInfrastructureExitCode(exitCode int) bool {
+	return exitCode == 125 || exitCode == 126 || exitCode == 127
+}
+
+func isMissingContainerError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return isMissingContainerMessage(err.Error())
+}
+
+func isMissingContainerMessage(message string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(normalized, "no such container") ||
+		strings.Contains(normalized, "container does not exist") ||
+		strings.Contains(normalized, "no container with name")
 }

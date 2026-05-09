@@ -3,7 +3,9 @@ package workcell
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -342,6 +344,36 @@ func TestPodmanBackend_Run_CommandFailure(t *testing.T) {
 	}
 }
 
+func TestPodmanBackend_Run_CommandFailureWithFakePodmanIsNotBackendError(t *testing.T) {
+	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
+case "$1" in
+  run) echo "command failed" >&2; exit 42 ;;
+  stop|kill|rm) exit 0 ;;
+esac
+exit 99
+`)}
+	profile := Profile{
+		ID:      "podman-test",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 60,
+		},
+	}
+	job := Job{
+		ID:      "test-fake-command-failure",
+		Command: []string{"sh", "-c", "exit 42"},
+	}
+
+	exit, _, _, err := backend.Run(context.Background(), job, profile)
+	if err != nil {
+		t.Fatalf("command failure should not return backend error, got: %v", err)
+	}
+	if exit != 42 {
+		t.Fatalf("exit = %d, want 42", exit)
+	}
+}
+
 func TestPodmanBackend_Run_InfrastructureFailure(t *testing.T) {
 	requirePodman(t)
 
@@ -368,6 +400,39 @@ func TestPodmanBackend_Run_InfrastructureFailure(t *testing.T) {
 	}
 	if !IsBackendError(err) {
 		t.Errorf("expected BackendError for infrastructure failure, got %T: %v", err, err)
+	}
+}
+
+func TestPodmanBackend_Run_PodmanExit125IsBackendError(t *testing.T) {
+	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
+case "$1" in
+  run) echo "image pull failed" >&2; exit 125 ;;
+  stop|kill|rm) echo "no such container" >&2; exit 1 ;;
+esac
+exit 99
+`)}
+	profile := Profile{
+		ID:      "podman-test",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "nonexistent-image-12345:latest",
+			Timeout: 60,
+		},
+	}
+	job := Job{
+		ID:      "test-fake-infra-failure",
+		Command: []string{"echo", "hello"},
+	}
+
+	exit, _, _, err := backend.Run(context.Background(), job, profile)
+	if err == nil {
+		t.Fatal("expected backend error for podman infrastructure exit")
+	}
+	if !IsBackendError(err) {
+		t.Fatalf("expected BackendError, got %T: %v", err, err)
+	}
+	if exit != 125 {
+		t.Fatalf("exit = %d, want 125", exit)
 	}
 }
 
@@ -406,12 +471,13 @@ func TestPodmanBackend_Run_TimeoutCleanup(t *testing.T) {
 	}
 }
 
-func TestPodmanBackend_Cleanup_ReturnsErrorOnFailure(t *testing.T) {
-	// This test verifies that Cleanup returns an error when cleanup fails
-	// We test with a non-existent container which should fail to stop/kill/rm
-	requirePodman(t)
-
-	backend := NewPodmanBackend()
+func TestPodmanBackend_Cleanup_IsIdempotentForMissingContainer(t *testing.T) {
+	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
+case "$1" in
+  stop|kill|rm) echo "Error: no such container: $4" >&2; exit 1 ;;
+esac
+exit 99
+`)}
 	profile := Profile{
 		ID:      "podman-test",
 		Backend: "podman",
@@ -425,14 +491,8 @@ func TestPodmanBackend_Cleanup_ReturnsErrorOnFailure(t *testing.T) {
 		Command: []string{"echo", "hello"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Try to cleanup a container that was never created
-	err := backend.Cleanup(ctx, job, profile)
-	// Cleanup should return an error since the container doesn't exist
-	if err == nil {
-		t.Error("cleanup should return error when container doesn't exist")
+	if err := backend.Cleanup(context.Background(), job, profile); err != nil {
+		t.Fatalf("cleanup should be idempotent for missing container: %v", err)
 	}
 }
 
@@ -462,10 +522,10 @@ func TestPodmanBackend_Cleanup_Success(t *testing.T) {
 		t.Fatalf("run failed: %v", err)
 	}
 
-	// Cleanup should succeed (container already removed by Run, but Cleanup handles this)
 	err = backend.Cleanup(ctx, job, profile)
-	// May error if container already gone, which is acceptable
-	t.Logf("cleanup result: %v", err)
+	if err != nil {
+		t.Fatalf("cleanup should succeed after Run removed container: %v", err)
+	}
 }
 
 // Image trust model test - documents that allowlisting is out of scope
@@ -497,9 +557,18 @@ func TestImageTrustModel_Documented(t *testing.T) {
 	if containerName == "" {
 		t.Error("container name should not be empty")
 	}
-	
+
 	// The profile image is used as-is without allowlist check
 	if profile.BackendConfig.Image == "" {
 		t.Error("image should be set")
 	}
+}
+
+func fakePodman(t *testing.T, script string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "podman")
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake podman: %v", err)
+	}
+	return path
 }
