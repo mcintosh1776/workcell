@@ -29,11 +29,12 @@ project must remain useful without ARX.
 Before implementation:
 
 - Iris reviews CLI/API/documentation ergonomics.
-- QA reviews test strategy and failure modes.
-- Security reviews threat model and isolation boundaries.
+- Inspector reviews test strategy and failure modes.
+- Sentinel reviews threat model and isolation boundaries.
 
-Implementation should proceed in small Steve-owned slices after the spec package
-is accepted.
+Implementation should proceed in small Steve/Linus-owned slices after the spec
+package is accepted. Steve should own the primary slice plan; Linus can take
+bounded engineering slices when the write scope is clear and non-overlapping.
 
 ## Validation discipline
 
@@ -41,4 +42,3 @@ Each implementation slice should include tests for the behavior it adds.
 If a backend integration cannot run in the local environment, provide a dry-run
 or fake-backend test seam and document the manual command that proves the real
 backend behavior.
-

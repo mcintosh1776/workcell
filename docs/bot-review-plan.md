@@ -21,7 +21,7 @@ Reviews:
 - whether Incus feels too intimidating
 - whether Podman fallback is discoverable
 
-### QA
+### Inspector
 
 Reviews:
 
@@ -32,7 +32,7 @@ Reviews:
 - log/artifact evidence quality
 - release smoke requirements
 
-### Security
+### Sentinel
 
 Reviews:
 
@@ -48,6 +48,12 @@ Reviews:
 
 Implements only approved slices from `docs/steve-build-plan.md`.
 
+### Linus
+
+Implements bounded engineering slices when the spec package identifies a clear
+non-overlapping write scope. Linus should not invent new subsystems or change the
+public API without a spec update.
+
 ### Sentinel
 
 Reviews Steve PRs and checks whether implementation evidence matches the spec.
@@ -55,10 +61,11 @@ Reviews Steve PRs and checks whether implementation evidence matches the spec.
 ## Review order
 
 1. Codex drafts spec package.
-2. Iris, QA, and Security review spec package.
+2. Iris, Inspector, and Sentinel review spec package.
 3. Codex resolves spec feedback.
-4. Steve implements slice 001.
-5. Sentinel reviews Steve's PR.
+4. Steve implements slice 001, optionally with Linus on a separate bounded
+   write scope.
+5. Sentinel reviews implementation PRs.
 
 ## Reviewer output format
 
@@ -68,4 +75,3 @@ Each review should return:
 - acceptable-for-v0.1 risks
 - later hardening items
 - concrete test or doc changes
-

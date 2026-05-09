@@ -1,9 +1,13 @@
-# Steve Build Plan
+# Steve And Linus Build Plan
 
-## Rule for Steve
+## Rule for Steve and Linus
 
 Do not build beyond the current slice. Do not add UI, cloud provisioning,
 ARX-specific integration, or broad scheduling unless the spec is updated first.
+
+Steve owns the overall implementation plan. Linus may implement bounded
+engineering slices when the write set is clear and does not overlap Steve's
+active slice.
 
 ## Slice 001: project skeleton and job model
 
@@ -104,4 +108,3 @@ Acceptance criteria:
 - canceled job is cleaned up.
 - cleanup can be run twice safely.
 - cleanup failure is visible.
-

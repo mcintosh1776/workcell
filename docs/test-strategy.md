@@ -60,11 +60,10 @@ workcell run --profile incus-smoke -- echo hello
 - cleanup runs after command failure
 - cleanup runs after timeout
 
-## QA review questions
+## Inspector review questions
 
 - Which cleanup failure modes are missing?
 - Which race conditions should be tested before v0.1?
 - Do we need concurrency tests in the first implementation slice?
 - What is the minimum real Incus smoke for release confidence?
 - What is the minimum real Podman smoke for release confidence?
-
