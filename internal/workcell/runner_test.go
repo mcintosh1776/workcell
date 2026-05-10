@@ -67,3 +67,102 @@ func TestRunnerFakeProfileCanFail(t *testing.T) {
 		t.Fatalf("ExitCode = %d, want 1", job.ExitCode)
 	}
 }
+
+func TestRunnerBackendFailurePreservesBackendExitAndError(t *testing.T) {
+	runner := NewRunner(map[string]Profile{
+		"podman-smoke": {
+			ID:      "podman-smoke",
+			Backend: "podman",
+			BackendConfig: BackendConfig{
+				Image:   "example.invalid/missing:latest",
+				Timeout: 60,
+			},
+		},
+	})
+	runner.backends["podman"] = backendFunc{
+		run: func(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
+			return 125, "", "image pull failed", &BackendError{Op: "create", Err: errors.New("image pull failed")}
+		},
+		cleanup: func(ctx context.Context, job Job, profile Profile) error {
+			return nil
+		},
+	}
+
+	job, err := runner.Run(context.Background(), SubmitJobRequest{
+		Profile: "podman-smoke",
+		Command: []string{"echo", "hello"},
+	})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if job.State != JobFailed {
+		t.Fatalf("State = %s, want %s", job.State, JobFailed)
+	}
+	if job.ExitCode != 125 {
+		t.Fatalf("ExitCode = %d, want 125", job.ExitCode)
+	}
+	if job.Error == "" {
+		t.Fatal("Error is empty, want backend failure detail")
+	}
+	if job.Logs.StderrBytes == 0 {
+		t.Fatal("StderrBytes = 0, want captured backend stderr")
+	}
+}
+
+func TestRunnerCleanupUsesFreshContextAfterRunContextExpires(t *testing.T) {
+	runner := NewRunner(map[string]Profile{
+		"podman-smoke": {
+			ID:      "podman-smoke",
+			Backend: "podman",
+			BackendConfig: BackendConfig{
+				Image:   "docker.io/library/alpine:3.20",
+				Timeout: 60,
+			},
+		},
+	})
+	runner.backends["podman"] = backendFunc{
+		run: func(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
+			if cancel, ok := ctx.Value(cancelContextKey{}).(context.CancelFunc); ok {
+				cancel()
+			}
+			return 0, "ok", "", nil
+		},
+		cleanup: func(ctx context.Context, job Job, profile Profile) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx = context.WithValue(ctx, cancelContextKey{}, context.CancelFunc(cancel))
+
+	job, err := runner.Run(ctx, SubmitJobRequest{
+		Profile: "podman-smoke",
+		Command: []string{"echo", "hello"},
+	})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if job.State != JobSucceeded {
+		t.Fatalf("State = %s, want %s", job.State, JobSucceeded)
+	}
+	if job.Cleanup.State != "complete" {
+		t.Fatalf("Cleanup.State = %s, want complete", job.Cleanup.State)
+	}
+}
+
+type backendFunc struct {
+	run     func(context.Context, Job, Profile) (int, string, string, error)
+	cleanup func(context.Context, Job, Profile) error
+}
+
+func (backend backendFunc) Run(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
+	return backend.run(ctx, job, profile)
+}
+
+func (backend backendFunc) Cleanup(ctx context.Context, job Job, profile Profile) error {
+	return backend.cleanup(ctx, job, profile)
+}
+
+type cancelContextKey struct{}

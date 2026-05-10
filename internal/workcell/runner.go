@@ -12,6 +12,7 @@ import (
 
 type Runner struct {
 	profiles map[string]Profile
+	backends map[string]Backend
 	jobs     map[string]Job
 	mu       sync.RWMutex
 }
@@ -21,8 +22,15 @@ func NewRunner(profiles map[string]Profile) *Runner {
 	for key, profile := range profiles {
 		copied[key] = profile
 	}
+
+	// Initialize backends
+	backends := make(map[string]Backend)
+	backends["fake"] = &FakeBackend{}
+	backends["podman"] = NewPodmanBackend()
+
 	return &Runner{
 		profiles: copied,
+		backends: backends,
 		jobs:     make(map[string]Job),
 	}
 }
@@ -60,15 +68,52 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 	default:
 	}
 
-	job.FinishedAt = time.Now().UTC()
-	job.Cleanup.State = "complete"
-	job.Logs.StdoutBytes = len(strings.Join(request.Command, " "))
-	if request.Command[0] == "false" {
+	// Get the backend for this profile
+	backend, ok := runner.backends[profile.Backend]
+	if !ok {
+		return Job{}, fmt.Errorf("%w: backend %s not found", ErrInvalidProfile, profile.Backend)
+	}
+
+	// Run the job
+	exitCode, stdout, stderr, err := backend.Run(ctx, job, profile)
+	if err != nil {
+		// Distinguish backend infrastructure errors from command failures
 		job.State = JobFailed
-		job.ExitCode = 1
-	} else {
+		if exitCode != 0 {
+			job.ExitCode = exitCode
+		} else {
+			job.ExitCode = -1
+		}
+		job.FinishedAt = time.Now().UTC()
+		job.Logs.StdoutBytes = len(stdout)
+		job.Logs.StderrBytes = len(stderr)
+		// Preserve backend error details
+		job.Error = err.Error()
+		runner.mu.Lock()
+		runner.jobs[job.ID] = job
+		runner.mu.Unlock()
+		return job, nil
+	}
+
+	job.FinishedAt = time.Now().UTC()
+	job.ExitCode = exitCode
+	if exitCode == 0 {
 		job.State = JobSucceeded
-		job.ExitCode = 0
+	} else {
+		job.State = JobFailed
+	}
+	job.Logs.StdoutBytes = len(stdout)
+	job.Logs.StderrBytes = len(stderr)
+
+	// Cleanup - do not silently treat failed cleanup as complete
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
+	cleanupErr := backend.Cleanup(cleanupCtx, job, profile)
+	if cleanupErr != nil {
+		job.Cleanup.State = "failed"
+		job.Cleanup.Error = cleanupErr.Error()
+	} else {
+		job.Cleanup.State = "complete"
 	}
 
 	runner.mu.Lock()
