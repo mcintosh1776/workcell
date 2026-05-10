@@ -8,8 +8,17 @@ Disposable workspaces for developers and AI agents.
 # Install
 go install github.com/mcintosh1776/workcell/cmd/workcell@latest
 
-# Run a test job
-workcell run --profile fake -- echo hello
+# Run a test job (requires Go build environment)
+go run ./cmd/workcell run --profile fake -- echo hello
+```
+
+Alternatively, build and run from source:
+
+```bash
+git clone https://github.com/mcintosh1776/workcell.git
+cd workcell
+go build -o workcell ./cmd/workcell
+./workcell run --profile fake -- echo hello
 ```
 
 See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
