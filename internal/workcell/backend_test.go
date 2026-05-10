@@ -162,7 +162,7 @@ func TestSanitizeContainerName(t *testing.T) {
 		{
 			name:       "very long job ID gets truncated",
 			jobID:      strings.Repeat("a", 200),
-			wantPrefix: "workcell-" + strings.Repeat("a", 107),
+			wantPrefix: "workcell-" + strings.Repeat("a", 106),
 		},
 		{
 			name:    "empty job ID errors",
@@ -212,11 +212,11 @@ func TestSanitizeContainerName_AvoidsCollisionAfterSanitization(t *testing.T) {
 
 func TestEffectiveDeadline(t *testing.T) {
 	tests := []struct {
-		name            string
-		callerDeadline  time.Duration // 0 means no deadline
-		profileTimeout  int           // 0 means no timeout
-		wantNewContext  bool          // whether we expect a new context with deadline
-		checkEarlier    bool          // if true, check that deadline is earlier than caller
+		name           string
+		callerDeadline time.Duration // 0 means no deadline
+		profileTimeout int           // 0 means no timeout
+		wantNewContext bool          // whether we expect a new context with deadline
+		checkEarlier   bool          // if true, check that deadline is earlier than caller
 	}{
 		{
 			name:           "no caller deadline, no profile timeout",
@@ -672,7 +672,7 @@ func TestImageTrustModel_Documented(t *testing.T) {
 	// - The backend uses caller-provided images without additional allowlist validation
 	// - Image trust enforcement is out of scope
 	// - Trust must be handled at registry or policy layer
-	
+
 	profile := Profile{
 		ID:      "podman-test",
 		Backend: "podman",
