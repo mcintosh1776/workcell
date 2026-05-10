@@ -4,7 +4,15 @@ Disposable workspaces for developers and AI agents.
 
 ## Quick Start
 
-Add a quick start section here.
+```bash
+# Install
+go install github.com/mcintosh1776/workcell/cmd/workcell@latest
+
+# Run a test job
+workcell run --profile fake -- echo hello
+```
+
+See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
 
 Workcell is a self-hosted execution runner for clean, repeatable command runs on
 your own build machine. It is Incus-first for machine-like workspaces and also
