@@ -67,15 +67,15 @@ func (b *FakeBackend) Cleanup(ctx context.Context, job Job, profile Profile) err
 // allowlist validation. Image trust enforcement is out of scope for this
 // implementation and must be handled at the registry or policy layer.
 type PodmanBackend struct {
-	binary string
+	binary          string
+	maxCaptureBytes int
 }
 
 var podmanBinary = "podman"
-var maxPodmanCaptureBytes = 10 * 1024 * 1024
 var errOutputLimitExceeded = errors.New("podman output limit exceeded")
 
 func NewPodmanBackend() *PodmanBackend {
-	return &PodmanBackend{binary: podmanBinary}
+	return &PodmanBackend{binary: podmanBinary, maxCaptureBytes: 10 * 1024 * 1024}
 }
 
 // sanitizeContainerName validates and sanitizes a job ID for use as a container name.
@@ -139,6 +139,9 @@ func effectiveDeadline(ctx context.Context, profile Profile) (context.Context, c
 }
 
 func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int, string, string, error) {
+	if len(job.Command) == 0 {
+		return 0, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("no command")}
+	}
 	if strings.TrimSpace(profile.BackendConfig.Image) == "" {
 		return 0, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("podman image is required")}
 	}
@@ -298,8 +301,12 @@ func (b *PodmanBackend) runPodman(ctx context.Context, args ...string) error {
 
 func (b *PodmanBackend) runPodmanCapture(ctx context.Context, args ...string) (string, string, error) {
 	cmd := b.command(ctx, args...)
-	stdout := &cappedBuffer{limit: maxPodmanCaptureBytes}
-	stderr := &cappedBuffer{limit: maxPodmanCaptureBytes}
+	captureLimit := b.maxCaptureBytes
+	if captureLimit <= 0 {
+		captureLimit = 10 * 1024 * 1024
+	}
+	stdout := &cappedBuffer{limit: captureLimit}
+	stderr := &cappedBuffer{limit: captureLimit}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	err := cmd.Run()

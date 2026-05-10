@@ -504,11 +504,6 @@ exit 99
 }
 
 func TestPodmanBackend_Run_OutputLimitExceededIsBackendError(t *testing.T) {
-	originalLimit := maxPodmanCaptureBytes
-	maxPodmanCaptureBytes = 16
-	defer func() {
-		maxPodmanCaptureBytes = originalLimit
-	}()
 	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
 case "$1" in
   create) exit 0 ;;
@@ -517,7 +512,7 @@ case "$1" in
   stop|kill|rm) exit 0 ;;
 esac
 exit 99
-`)}
+`), maxCaptureBytes: 16}
 	profile := Profile{
 		ID:      "podman-test",
 		Backend: "podman",
@@ -546,6 +541,36 @@ exit 99
 	}
 	if !strings.Contains(stdout, "[output truncated]") {
 		t.Fatalf("stdout = %q, want truncation marker", stdout)
+	}
+}
+
+func TestPodmanBackend_Run_EmptyCommandFailsFast(t *testing.T) {
+	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
+echo "podman should not be called" >&2
+exit 99
+`)}
+	profile := Profile{
+		ID:      "podman-test",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 60,
+		},
+	}
+	job := Job{
+		ID:      "test-empty-command",
+		Command: []string{},
+	}
+
+	_, _, _, err := backend.Run(context.Background(), job, profile)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !IsBackendError(err) {
+		t.Fatalf("expected BackendError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "no command") {
+		t.Fatalf("error = %q, want no command detail", err.Error())
 	}
 }
 
