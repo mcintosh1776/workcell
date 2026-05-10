@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,6 +32,11 @@ func main() {
 			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
+	case "init":
+		if err := initCmd(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
+			os.Exit(1)
+		}
 	case "version":
 		fmt.Println("workcell dev")
 	case "help", "--help", "-h":
@@ -44,9 +50,46 @@ func main() {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
+  workcell init [--runtime fake]
   workcell run --profile fake -- <command> [args...]
   workcell serve [--addr 127.0.0.1:8787]
   workcell version`)
+}
+
+func initCmd(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	runtime := fs.String("runtime", "fake", "runtime to initialize (fake)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if *runtime != "fake" {
+		return fmt.Errorf("unsupported runtime: %s (only 'fake' is supported)", *runtime)
+	}
+
+	configDir := ".workcell"
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	configPath := filepath.Join(configDir, "config.yaml")
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("config already exists: %s", configPath)
+	}
+
+	configContent := `profiles:
+  fake:
+    backend: fake
+    description: In-process backend for local development and testing.
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	fmt.Printf("Initialized workcell project with fake runtime\n")
+	fmt.Printf("Config: %s\n", configPath)
+	return nil
 }
 
 func run(args []string) error {
