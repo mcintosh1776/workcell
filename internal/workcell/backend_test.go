@@ -503,6 +503,52 @@ exit 99
 	}
 }
 
+func TestPodmanBackend_Run_OutputLimitExceededIsBackendError(t *testing.T) {
+	originalLimit := maxPodmanCaptureBytes
+	maxPodmanCaptureBytes = 16
+	defer func() {
+		maxPodmanCaptureBytes = originalLimit
+	}()
+	backend := &PodmanBackend{binary: fakePodman(t, `#!/bin/sh
+case "$1" in
+  create) exit 0 ;;
+  start) printf '0123456789abcdefEXTRA'; exit 0 ;;
+  inspect) echo 0; exit 0 ;;
+  stop|kill|rm) exit 0 ;;
+esac
+exit 99
+`)}
+	profile := Profile{
+		ID:      "podman-test",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 60,
+		},
+	}
+	job := Job{
+		ID:      "test-output-limit",
+		Command: []string{"echo", "hello"},
+	}
+
+	exit, stdout, _, err := backend.Run(context.Background(), job, profile)
+	if err == nil {
+		t.Fatal("expected output limit error")
+	}
+	if !IsBackendError(err) {
+		t.Fatalf("expected BackendError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "podman output limit exceeded") {
+		t.Fatalf("error = %q, want output limit detail", err.Error())
+	}
+	if exit != 0 {
+		t.Fatalf("exit = %d, want inspected command exit 0", exit)
+	}
+	if !strings.Contains(stdout, "[output truncated]") {
+		t.Fatalf("stdout = %q, want truncation marker", stdout)
+	}
+}
+
 func TestPodmanBackend_Run_TimeoutCleanup(t *testing.T) {
 	requirePodman(t)
 

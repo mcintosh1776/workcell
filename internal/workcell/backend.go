@@ -71,6 +71,8 @@ type PodmanBackend struct {
 }
 
 var podmanBinary = "podman"
+var maxPodmanCaptureBytes = 10 * 1024 * 1024
+var errOutputLimitExceeded = errors.New("podman output limit exceeded")
 
 func NewPodmanBackend() *PodmanBackend {
 	return &PodmanBackend{binary: podmanBinary}
@@ -198,6 +200,9 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 	_ = b.forceRemoveContainer(cleanupCtx, containerName)
 
 	if startErr != nil {
+		if errors.Is(startErr, errOutputLimitExceeded) {
+			return exitCode, stdout, stderr, &BackendError{Op: "output", Err: errorWithOutput(startErr, stderr)}
+		}
 		if ctx.Err() != nil {
 			return podmanProcessExitCode(startErr), stdout, stderr, &BackendError{Op: "start", Err: errorWithOutput(ctx.Err(), stderr)}
 		}
@@ -293,11 +298,51 @@ func (b *PodmanBackend) runPodman(ctx context.Context, args ...string) error {
 
 func (b *PodmanBackend) runPodmanCapture(ctx context.Context, args ...string) (string, string, error) {
 	cmd := b.command(ctx, args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdout := &cappedBuffer{limit: maxPodmanCaptureBytes}
+	stderr := &cappedBuffer{limit: maxPodmanCaptureBytes}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	err := cmd.Run()
+	if stdout.truncated || stderr.truncated {
+		if err == nil {
+			err = errOutputLimitExceeded
+		} else {
+			err = fmt.Errorf("%w: %v", errOutputLimitExceeded, err)
+		}
+	}
 	return stdout.String(), stderr.String(), err
+}
+
+type cappedBuffer struct {
+	buffer    bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func (b *cappedBuffer) Write(p []byte) (int, error) {
+	if b.limit <= 0 {
+		b.truncated = true
+		return len(p), nil
+	}
+	remaining := b.limit - b.buffer.Len()
+	if remaining <= 0 {
+		b.truncated = true
+		return len(p), nil
+	}
+	if len(p) > remaining {
+		_, _ = b.buffer.Write(p[:remaining])
+		b.truncated = true
+		return len(p), nil
+	}
+	_, _ = b.buffer.Write(p)
+	return len(p), nil
+}
+
+func (b *cappedBuffer) String() string {
+	if b.truncated {
+		return b.buffer.String() + "\n[output truncated]"
+	}
+	return b.buffer.String()
 }
 
 func (b *PodmanBackend) inspectExitCode(ctx context.Context, containerName string) (int, bool) {
