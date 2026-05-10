@@ -10,7 +10,6 @@ func TestInitCmdFakeRuntimeHappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
 	
-	// Change to temp dir for the test
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -31,8 +30,7 @@ func TestInitCmdFakeRuntimeHappyPath(t *testing.T) {
 
 	expected := "backend: fake"
 	if !contains(string(content), expected) {
-		t.Errorf("config missing %q, got:
-%s", expected, content)
+		t.Errorf("config missing %q, got: %q", expected, string(content))
 	}
 }
 
@@ -40,12 +38,10 @@ func TestInitCmdExistingConfigPathCollision(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
 	
-	// Create existing config
 	if err := os.WriteFile(configPath, []byte("existing"), 0o644); err != nil {
 		t.Fatalf("failed to create existing config: %v", err)
 	}
 
-	// Change to temp dir for the test
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -63,20 +59,18 @@ func TestInitCmdExistingConfigPathCollision(t *testing.T) {
 		t.Errorf("expected 'already exists' error, got: %v", err)
 	}
 
-	// Verify existing content was not overwritten
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("failed to read config: %v", err)
 	}
 	if string(content) != "existing" {
-		t.Errorf("config was overwritten, got: %s", content)
+		t.Errorf("config was overwritten, got: %q", string(content))
 	}
 }
 
 func TestInitCmdUnsupportedRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
 	
-	// Change to temp dir for the test
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -94,7 +88,6 @@ func TestInitCmdUnsupportedRuntime(t *testing.T) {
 		t.Errorf("expected 'unsupported runtime' error, got: %v", err)
 	}
 
-	// Verify no config was created
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
 	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
 		t.Error("config file should not exist for unsupported runtime")
@@ -105,7 +98,6 @@ func TestInitCmdPodmanRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
 	
-	// Change to temp dir for the test
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -126,8 +118,7 @@ func TestInitCmdPodmanRuntime(t *testing.T) {
 
 	expected := "backend: podman"
 	if !contains(string(content), expected) {
-		t.Errorf("config missing %q, got:
-%s", expected, content)
+		t.Errorf("config missing %q, got: %q", expected, string(content))
 	}
 }
 
@@ -135,7 +126,6 @@ func TestInitCmdIncusRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
 	
-	// Change to temp dir for the test
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -156,16 +146,15 @@ func TestInitCmdIncusRuntime(t *testing.T) {
 
 	expected := "backend: incus"
 	if !contains(string(content), expected) {
-		t.Errorf("config missing %q, got:
-%s", expected, content)
+		t.Errorf("config missing %q, got: %q", expected, string(content))
 	}
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsInternal(s, substr))
 }
 
-func containsHelper(s, substr string) bool {
+func containsInternal(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return true
