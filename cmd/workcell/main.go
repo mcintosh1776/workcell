@@ -31,6 +31,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
+	case "init":
+		if err := initCmd(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "workcell: %v
+", err)
+			os.Exit(1)
+		}
 	case "version":
 		fmt.Println("workcell dev")
 	case "help", "--help", "-h":
@@ -44,9 +50,62 @@ func main() {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
+  workcell init [--runtime fake|podman|incus]
   workcell run --profile fake -- <command> [args...]
   workcell serve [--addr 127.0.0.1:8787]
   workcell version`)
+}
+
+func initCmd(args []string) error {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	runtime := fs.String("runtime", "fake", "runtime to configure (fake, podman, incus)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	configPath := "workcell.yaml"
+	
+	// Check for existing config to avoid overwriting
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("config file already exists: %s", configPath)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("cannot check config file: %w", err)
+	}
+
+	var content string
+	switch *runtime {
+	case "fake":
+		content = `profiles:
+  fake:
+    backend: fake
+    description: In-process backend for testing
+`
+	case "podman":
+		content = `profiles:
+  podman-smoke:
+    backend: podman
+    image: docker.io/library/alpine:3.20
+    timeoutSeconds: 300
+`
+	case "incus":
+		content = `profiles:
+  incus-smoke:
+    backend: incus
+    image: images:ubuntu/24.04
+    timeoutSeconds: 900
+`
+	default:
+		return fmt.Errorf("unsupported runtime: %s", *runtime)
+	}
+
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	fmt.Printf("Initialized workcell.yaml with %s runtime
+", *runtime)
+	return nil
 }
 
 func run(args []string) error {
