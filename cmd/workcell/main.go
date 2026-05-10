@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/mcintosh1776/workcell/internal/workcell"
 )
@@ -23,20 +21,17 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		if err := run(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v
-", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
 	case "serve":
 		if err := serve(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v
-", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
 	case "init":
 		if err := initCmd(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v
-", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
 	case "version":
@@ -44,9 +39,7 @@ func main() {
 	case "help", "--help", "-h":
 		usage()
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s
-
-", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
 		usage()
 		os.Exit(64)
 	}
@@ -69,7 +62,7 @@ func initCmd(args []string) error {
 	}
 
 	configPath := "workcell.yaml"
-	
+
 	if _, err := os.Stat(configPath); err == nil {
 		return fmt.Errorf("config file already exists: %s", configPath)
 	} else if !os.IsNotExist(err) {
@@ -106,8 +99,7 @@ func initCmd(args []string) error {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
-	fmt.Printf("Initialized workcell.yaml with %s runtime
-", *runtime)
+	fmt.Printf("Initialized workcell.yaml with %s runtime\n", *runtime)
 	return nil
 }
 
@@ -173,9 +165,9 @@ func serve(args []string) error {
 	})
 	mux.HandleFunc("GET /v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		job, err := runner.GetJob(r.Context(), id)
-		if err != nil {
-			writeError(w, http.StatusNotFound, workcell.ErrorCode(err), err.Error())
+		job, ok := runner.Get(id)
+		if !ok {
+			writeError(w, http.StatusNotFound, "not_found", "job not found")
 			return
 		}
 		writeJSON(w, http.StatusOK, job)

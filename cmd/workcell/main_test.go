@@ -9,7 +9,7 @@ import (
 func TestInitCmdFakeRuntimeHappyPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
-	
+
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -37,7 +37,7 @@ func TestInitCmdFakeRuntimeHappyPath(t *testing.T) {
 func TestInitCmdExistingConfigPathCollision(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
-	
+
 	if err := os.WriteFile(configPath, []byte("existing"), 0o644); err != nil {
 		t.Fatalf("failed to create existing config: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestInitCmdExistingConfigPathCollision(t *testing.T) {
 
 func TestInitCmdUnsupportedRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -97,7 +97,7 @@ func TestInitCmdUnsupportedRuntime(t *testing.T) {
 func TestInitCmdPodmanRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
-	
+
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
@@ -125,7 +125,7 @@ func TestInitCmdPodmanRuntime(t *testing.T) {
 func TestInitCmdIncusRuntime(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "workcell.yaml")
-	
+
 	origDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd: %v", err)
