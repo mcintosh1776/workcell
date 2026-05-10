@@ -69,6 +69,9 @@ Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,
 which exists to prove the job model, command validation, API shape, and test
 harness before Podman or Incus are wired in.
 
+The repository also serves as a small end-to-end smoke target for the Steve,
+QA, and Sentinel bot review workflow.
+
 Prerequisites:
 
 - Go 1.22 or newer
