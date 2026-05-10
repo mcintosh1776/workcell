@@ -3,6 +3,7 @@ package workcell
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -99,9 +100,12 @@ func sanitizeContainerName(jobID string) (string, error) {
 		}
 	}
 
-	name := prefix + string(sanitized)
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(jobID)))[:12]
+	name := prefix + string(sanitized) + "-" + hash
 	if len(name) > 128 {
-		name = name[:128]
+		suffix := "-" + hash
+		maxSanitized := 128 - len(prefix) - len(suffix)
+		name = prefix + string(sanitized[:maxSanitized]) + suffix
 	}
 
 	return name, nil
@@ -156,6 +160,12 @@ func (b *PodmanBackend) Run(ctx context.Context, job Job, profile Profile) (int,
 		"--network", "none",
 		"--security-opt", "no-new-privileges",
 		"--user", "65532:65532",
+		"--pids-limit", "256",
+		"--memory", "512m",
+		"--cpus", "1",
+		"--read-only",
+		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+		"--tmpfs", "/var/tmp:rw,noexec,nosuid,size=64m",
 	}
 	if profile.BackendConfig.Timeout > 0 {
 		// Add a podman timeout as well for extra safety

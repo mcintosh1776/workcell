@@ -129,40 +129,40 @@ func TestBackendError_DistinguishableFromExitFailure(t *testing.T) {
 
 func TestSanitizeContainerName(t *testing.T) {
 	tests := []struct {
-		name    string
-		jobID   string
-		want    string
-		wantErr bool
+		name       string
+		jobID      string
+		wantPrefix string
+		wantErr    bool
 	}{
 		{
-			name:  "valid job ID",
-			jobID: "job_abc123",
-			want:  "workcell-job_abc123",
+			name:       "valid job ID",
+			jobID:      "job_abc123",
+			wantPrefix: "workcell-job_abc123-",
 		},
 		{
-			name:  "job ID with hyphens",
-			jobID: "job-abc-123",
-			want:  "workcell-job-abc-123",
+			name:       "job ID with hyphens",
+			jobID:      "job-abc-123",
+			wantPrefix: "workcell-job-abc-123-",
 		},
 		{
-			name:  "job ID with underscores",
-			jobID: "job_abc_123",
-			want:  "workcell-job_abc_123",
+			name:       "job ID with underscores",
+			jobID:      "job_abc_123",
+			wantPrefix: "workcell-job_abc_123-",
 		},
 		{
-			name:  "job ID starting with underscore gets prefix",
-			jobID: "_job123",
-			want:  "workcell-j_job123",
+			name:       "job ID starting with underscore gets prefix",
+			jobID:      "_job123",
+			wantPrefix: "workcell-j_job123-",
 		},
 		{
-			name:  "job ID with invalid chars",
-			jobID: "job@123#test",
-			want:  "workcell-job-123-test",
+			name:       "job ID with invalid chars",
+			jobID:      "job@123#test",
+			wantPrefix: "workcell-job-123-test-",
 		},
 		{
-			name:  "very long job ID gets truncated",
-			jobID: strings.Repeat("a", 200),
-			want:  "workcell-" + strings.Repeat("a", 119),
+			name:       "very long job ID gets truncated",
+			jobID:      strings.Repeat("a", 200),
+			wantPrefix: "workcell-" + strings.Repeat("a", 107),
 		},
 		{
 			name:    "empty job ID errors",
@@ -184,13 +184,27 @@ func TestSanitizeContainerName(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("sanitizeContainerName() = %q, want %q", got, tt.want)
+			if !strings.HasPrefix(got, tt.wantPrefix) {
+				t.Errorf("sanitizeContainerName() = %q, want prefix %q", got, tt.wantPrefix)
 			}
 			if len(got) > 128 {
 				t.Errorf("container name too long: %d chars", len(got))
 			}
 		})
+	}
+}
+
+func TestSanitizeContainerName_AvoidsCollisionAfterSanitization(t *testing.T) {
+	left, err := sanitizeContainerName("job@123")
+	if err != nil {
+		t.Fatalf("sanitize left: %v", err)
+	}
+	right, err := sanitizeContainerName("job-123")
+	if err != nil {
+		t.Fatalf("sanitize right: %v", err)
+	}
+	if left == right {
+		t.Fatalf("sanitized container names collided: %q", left)
 	}
 }
 
@@ -438,6 +452,54 @@ exit 99
 	}
 	if exit != 125 {
 		t.Fatalf("exit = %d, want 125", exit)
+	}
+}
+
+func TestPodmanBackend_Run_CreateUsesResourceAndFilesystemLimits(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "podman-create-args.log")
+	backend := &PodmanBackend{binary: fakePodman(t, fmt.Sprintf(`#!/bin/sh
+case "$1" in
+  create) printf '%%s\n' "$*" > %q; exit 0 ;;
+  start) exit 0 ;;
+  inspect) echo 0; exit 0 ;;
+  stop|kill|rm) exit 0 ;;
+esac
+exit 99
+`, logPath))}
+	profile := Profile{
+		ID:      "podman-test",
+		Backend: "podman",
+		BackendConfig: BackendConfig{
+			Image:   "docker.io/library/alpine:3.20",
+			Timeout: 60,
+		},
+	}
+	job := Job{
+		ID:      "test-resource-limits",
+		Command: []string{"echo", "hello"},
+	}
+
+	_, _, _, err := backend.Run(context.Background(), job, profile)
+	if err != nil {
+		t.Fatalf("run should not fail: %v", err)
+	}
+	argsBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read podman args log: %v", err)
+	}
+	args := string(argsBytes)
+	required := []string{
+		"--pids-limit 256",
+		"--memory 512m",
+		"--cpus 1",
+		"--read-only",
+		"--tmpfs /tmp:rw,noexec,nosuid,size=64m",
+		"--tmpfs /var/tmp:rw,noexec,nosuid,size=64m",
+	}
+	for _, item := range required {
+		if !strings.Contains(args, item) {
+			t.Fatalf("create args missing %q in %q", item, args)
+		}
 	}
 }
 
