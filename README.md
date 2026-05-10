@@ -2,6 +2,10 @@
 
 Disposable workspaces for developers and AI agents.
 
+## Quick Start
+
+Add a quick start section here.
+
 Workcell is a self-hosted execution runner for clean, repeatable command runs on
 your own build machine. It is Incus-first for machine-like workspaces and also
 supports Podman for fast container checks.
