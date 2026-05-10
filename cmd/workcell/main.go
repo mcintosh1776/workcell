@@ -23,12 +23,14 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		if err := run(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v
+", err)
 			os.Exit(1)
 		}
 	case "serve":
 		if err := serve(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v
+", err)
 			os.Exit(1)
 		}
 	case "init":
@@ -42,7 +44,9 @@ func main() {
 	case "help", "--help", "-h":
 		usage()
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "unknown command: %s
+
+", os.Args[1])
 		usage()
 		os.Exit(64)
 	}
@@ -66,7 +70,6 @@ func initCmd(args []string) error {
 
 	configPath := "workcell.yaml"
 	
-	// Check for existing config to avoid overwriting
 	if _, err := os.Stat(configPath); err == nil {
 		return fmt.Errorf("config file already exists: %s", configPath)
 	} else if !os.IsNotExist(err) {
@@ -166,46 +169,33 @@ func serve(args []string) error {
 			writeError(w, http.StatusBadRequest, workcell.ErrorCode(err), err.Error())
 			return
 		}
-		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": job})
+		writeJSON(w, http.StatusAccepted, job)
 	})
-	mux.HandleFunc("GET /v1/jobs/{jobId}", func(w http.ResponseWriter, r *http.Request) {
-		job, ok := runner.Get(r.PathValue("jobId"))
-		if !ok {
-			writeError(w, http.StatusNotFound, "job_not_found", "job not found")
+	mux.HandleFunc("GET /v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		job, err := runner.GetJob(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusNotFound, workcell.ErrorCode(err), err.Error())
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": job})
+		writeJSON(w, http.StatusOK, job)
 	})
 
-	server := &http.Server{
-		Addr:              *addr,
-		Handler:           requestLogger(mux),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-	slog.Info("workcell listening", "addr", *addr)
-	return server.ListenAndServe()
+	slog.Info("workcell server listening", "addr", *addr)
+	return http.ListenAndServe(*addr, mux)
 }
 
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("content-type", "application/json")
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.Encode(v)
 }
 
 func writeError(w http.ResponseWriter, status int, code string, message string) {
 	writeJSON(w, status, map[string]any{
-		"ok": false,
-		"error": map[string]string{
-			"code":    code,
-			"message": message,
-		},
-	})
-}
-
-func requestLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		started := time.Now()
-		next.ServeHTTP(w, r)
-		slog.Info("request", "method", r.Method, "path", r.URL.Path, "duration", strings.TrimSuffix(time.Since(started).String(), "0s"))
+		"error":   code,
+		"message": message,
 	})
 }
