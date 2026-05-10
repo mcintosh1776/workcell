@@ -23,6 +23,9 @@ For code editing and fake-backend tests:
 - `gofmt`
 - `jq`
 
+The `fake` profile is the safest local CLI smoke path because it validates the
+command model without starting Podman or Incus workloads.
+
 Run:
 
 ```bash
@@ -100,10 +103,7 @@ Prerequisites on the operator machine:
 Example:
 
 ```bash
-HCLOUD_TOKEN=... \
-WORKCELL_LAB_SSH_KEY_ID=123456 \
-WORKCELL_LAB_SSH_SOURCE_CIDR="$(curl -sS https://api.ipify.org)/32" \
-scripts/provision-hetzner-lab-host.sh --yes
+HCLOUD_TOKEN=... WORKCELL_LAB_SSH_KEY_ID=123456 WORKCELL_LAB_SSH_SOURCE_CIDR="$(curl -sS https://api.ipify.org)/32" scripts/provision-hetzner-lab-host.sh --yes
 ```
 
 The helper creates:
@@ -126,18 +126,13 @@ After provisioning, SSH to the host and follow the lab bootstrap above.
 Once a lab host is bootstrapped:
 
 ```bash
-WORKCELL_LAB_SSH_HOST=<host> \
-WORKCELL_LAB_SSH_KEY=<path-to-key> \
-scripts/run-remote-lab-preflight.sh
+WORKCELL_LAB_SSH_HOST=<host> WORKCELL_LAB_SSH_KEY=<path-to-key> scripts/run-remote-lab-preflight.sh
 ```
 
 To include live Podman and Incus container smoke jobs:
 
 ```bash
-WORKCELL_LAB_PREFLIGHT_RUN_BACKEND_SMOKES=1 \
-WORKCELL_LAB_SSH_HOST=<host> \
-WORKCELL_LAB_SSH_KEY=<path-to-key> \
-scripts/run-remote-lab-preflight.sh
+WORKCELL_LAB_PREFLIGHT_RUN_BACKEND_SMOKES=1 WORKCELL_LAB_SSH_HOST=<host> WORKCELL_LAB_SSH_KEY=<path-to-key> scripts/run-remote-lab-preflight.sh
 ```
 
 ## Teardown
