@@ -31,8 +31,7 @@ func TestQuickStartExamples(t *testing.T) {
 	}
 	
 	// Validate actual output content from the echo command
-	expectedOutput := "hello
-"
+	expectedOutput := "hello\n"
 	if job.Output != expectedOutput {
 		t.Errorf("Expected output %q, got %q", expectedOutput, job.Output)
 	}
