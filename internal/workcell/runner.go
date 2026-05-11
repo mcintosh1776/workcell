@@ -87,6 +87,8 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 		job.FinishedAt = time.Now().UTC()
 		job.Logs.StdoutBytes = len(stdout)
 		job.Logs.StderrBytes = len(stderr)
+		job.Stdout = stdout
+		job.Stderr = stderr
 		// Preserve backend error details
 		job.Error = err.Error()
 		runner.mu.Lock()
@@ -97,6 +99,8 @@ func (runner *Runner) Run(ctx context.Context, request SubmitJobRequest) (Job, e
 
 	job.FinishedAt = time.Now().UTC()
 	job.ExitCode = exitCode
+	job.Stdout = stdout
+	job.Stderr = stderr
 	if exitCode == 0 {
 		job.State = JobSucceeded
 	} else {

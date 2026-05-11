@@ -10,7 +10,7 @@ import (
 func TestQuickStartExamples(t *testing.T) {
 	runner := NewRunner(DefaultProfiles())
 
-	// Test the basic fake profile example from README
+	// Test the basic fake profile example from README.
 	job, err := runner.Run(context.Background(), SubmitJobRequest{
 		Profile: "fake",
 		Command: []string{"echo", "hello"},
@@ -29,6 +29,7 @@ func TestQuickStartExamples(t *testing.T) {
 	if job.Cleanup.State != "complete" {
 		t.Errorf("Expected cleanup complete, got '%s'", job.Cleanup.State)
 	}
-	
-	// Output validation skipped - Job struct does not contain an Output field to access the command output
+	if job.Stdout != "echo hello" {
+		t.Errorf("Expected stdout %q, got %q", "echo hello", job.Stdout)
+	}
 }

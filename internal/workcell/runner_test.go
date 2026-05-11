@@ -25,6 +25,9 @@ func TestRunnerFakeProfileSucceeds(t *testing.T) {
 	if job.Cleanup.State != "complete" {
 		t.Fatalf("Cleanup.State = %s, want complete", job.Cleanup.State)
 	}
+	if job.Stdout != "echo hello" {
+		t.Fatalf("Stdout = %q, want %q", job.Stdout, "echo hello")
+	}
 }
 
 func TestRunnerRejectsInvalidProfile(t *testing.T) {
@@ -106,6 +109,9 @@ func TestRunnerBackendFailurePreservesBackendExitAndError(t *testing.T) {
 	}
 	if job.Logs.StderrBytes == 0 {
 		t.Fatal("StderrBytes = 0, want captured backend stderr")
+	}
+	if job.Stderr != "image pull failed" {
+		t.Fatalf("Stderr = %q, want backend stderr detail", job.Stderr)
 	}
 }
 
