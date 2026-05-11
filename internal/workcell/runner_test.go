@@ -3,6 +3,7 @@ package workcell
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -130,6 +131,12 @@ func TestRunnerBackendFailurePreservesBackendExitAndError(t *testing.T) {
 	}
 	if job.Error == "" {
 		t.Fatal("Error is empty, want backend failure detail")
+	}
+	if !strings.Contains(job.Error, "image pull failed") {
+		t.Fatalf("Error = %q, want backend failure detail", job.Error)
+	}
+	if job.Stdout != "" {
+		t.Fatalf("Stdout = %q, want empty stdout for backend failure", job.Stdout)
 	}
 	if job.Logs.StderrBytes == 0 {
 		t.Fatal("StderrBytes = 0, want captured backend stderr")
