@@ -2,6 +2,8 @@
 
 Disposable workspaces for developers and AI agents.
 
+**Status: Active Development**
+
 ## Quick Start
 
 ```bash
