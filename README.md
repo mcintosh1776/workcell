@@ -21,6 +21,9 @@ go build -o workcell ./cmd/workcell
 ./workcell run --profile fake -- echo hello
 ```
 
+> [!WARNING]
+> The examples above use a `fake` profile for testing. In production, avoid running arbitrary commands in disposable workspaces without proper validation and security considerations. The fake profile is intended for development and testing only.
+
 See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
 
 Workcell is a self-hosted execution runner for clean, repeatable command runs on
