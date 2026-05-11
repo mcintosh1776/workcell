@@ -53,7 +53,7 @@ func (b *FakeBackend) Run(ctx context.Context, job Job, profile Profile) (int, s
 	}
 	stdout := strings.Join(job.Command, " ")
 	if job.Command[0] == "false" {
-		return 1, "", "", nil
+		return 1, stdout, "", nil
 	}
 	return 0, stdout, "", nil
 }

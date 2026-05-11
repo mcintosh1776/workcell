@@ -73,6 +73,9 @@ func TestRunnerFakeProfileCanFail(t *testing.T) {
 	if job.ExitCode != 1 {
 		t.Fatalf("ExitCode = %d, want 1", job.ExitCode)
 	}
+	if job.Stdout != "false" {
+		t.Fatalf("Stdout = %q, want %q", job.Stdout, "false")
+	}
 	if job.Error != "" {
 		t.Fatalf("Error = %q, want empty for command exit failure", job.Error)
 	}

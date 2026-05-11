@@ -42,7 +42,7 @@ func TestFakeBackend_Run(t *testing.T) {
 			name:       "false command returns exit 1",
 			command:    []string{"false"},
 			wantExit:   1,
-			wantStdout: "",
+			wantStdout: "false",
 		},
 		{
 			name:           "empty command errors",
