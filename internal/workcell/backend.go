@@ -51,17 +51,11 @@ func (b *FakeBackend) Run(ctx context.Context, job Job, profile Profile) (int, s
 	if len(job.Command) == 0 {
 		return 1, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("no command")}
 	}
-	switch job.Command[0] {
-	case "echo":
-		return 0, strings.Join(job.Command[1:], " ") + "\n", "", nil
-	case "false":
+	stdout := strings.Join(job.Command, " ")
+	if job.Command[0] == "false" {
 		return 1, "", "", nil
-	default:
-		return 1, "", "", &BackendError{
-			Op:  "validate",
-			Err: fmt.Errorf("fake backend only supports deterministic echo and false commands"),
-		}
 	}
+	return 0, stdout, "", nil
 }
 
 func (b *FakeBackend) Cleanup(ctx context.Context, job Job, profile Profile) error {

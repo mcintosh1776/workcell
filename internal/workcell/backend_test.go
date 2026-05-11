@@ -36,7 +36,7 @@ func TestFakeBackend_Run(t *testing.T) {
 			name:       "echo command",
 			command:    []string{"echo", "hello"},
 			wantExit:   0,
-			wantStdout: "hello\n",
+			wantStdout: "echo hello",
 		},
 		{
 			name:       "false command returns exit 1",
@@ -47,12 +47,6 @@ func TestFakeBackend_Run(t *testing.T) {
 		{
 			name:           "empty command errors",
 			command:        []string{},
-			wantErr:        true,
-			wantBackendErr: true,
-		},
-		{
-			name:           "unsupported command errors",
-			command:        []string{"date"},
 			wantErr:        true,
 			wantBackendErr: true,
 		},
