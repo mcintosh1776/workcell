@@ -14,9 +14,10 @@ go build -o workcell ./cmd/workcell
 
 > [!WARNING]
 > The example above uses the `fake` profile for development smoke tests only.
-> It does not execute arbitrary commands. It recognizes only a small
-> deterministic command subset, such as `echo` and `false`, and rejects
-> unsupported commands. This lets the CLI, job model, output capture, and cleanup
+> It does not execute arbitrary commands. It recognizes exactly two deterministic
+> command forms today: `echo ...` and `false`. All other commands are rejected.
+> Any previous fallback echo-back behavior was internal scaffolding, not a stable
+> public contract. This lets the CLI, job model, output capture, and cleanup
 > contract be tested before Podman or Incus execution is enabled.
 
 See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
