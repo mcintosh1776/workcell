@@ -14,9 +14,10 @@ go build -o workcell ./cmd/workcell
 
 > [!WARNING]
 > The example above uses the `fake` profile for development smoke tests only.
-> It does not execute arbitrary commands. It simulates a small deterministic
-> command subset so the CLI, job model, output capture, and cleanup contract can
-> be tested before Podman or Incus execution is enabled.
+> It does not execute arbitrary commands. It recognizes only a small
+> deterministic command subset, such as `echo` and `false`, and rejects
+> unsupported commands. This lets the CLI, job model, output capture, and cleanup
+> contract be tested before Podman or Incus execution is enabled.
 
 See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
 
@@ -86,7 +87,8 @@ Current bot handoffs live under [docs/bot-handoffs](docs/bot-handoffs).
 Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,
 which exists to prove the job model, command validation, API shape, output
 capture, and test harness before Podman or Incus are wired in. The fake backend
-is deterministic scaffolding; it is not a real command execution backend.
+is deterministic scaffolding; it is not a real command execution backend and it
+rejects unsupported commands.
 
 The repository also serves as a small end-to-end smoke target for the Steve,
 QA, and Sentinel bot review workflow.

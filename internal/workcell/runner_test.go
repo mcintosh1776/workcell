@@ -25,6 +25,9 @@ func TestRunnerFakeProfileSucceeds(t *testing.T) {
 	if job.Cleanup.State != "complete" {
 		t.Fatalf("Cleanup.State = %s, want complete", job.Cleanup.State)
 	}
+	if job.Error != "" {
+		t.Fatalf("Error = %q, want empty for successful fake job", job.Error)
+	}
 	if job.Stdout != "hello\n" {
 		t.Fatalf("Stdout = %q, want %q", job.Stdout, "hello\n")
 	}
@@ -68,6 +71,27 @@ func TestRunnerFakeProfileCanFail(t *testing.T) {
 	}
 	if job.ExitCode != 1 {
 		t.Fatalf("ExitCode = %d, want 1", job.ExitCode)
+	}
+	if job.Error != "" {
+		t.Fatalf("Error = %q, want empty for command exit failure", job.Error)
+	}
+}
+
+func TestRunnerFakeProfileRejectsUnsupportedCommand(t *testing.T) {
+	runner := NewRunner(DefaultProfiles())
+
+	job, err := runner.Run(context.Background(), SubmitJobRequest{
+		Profile: "fake",
+		Command: []string{"date"},
+	})
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if job.State != JobFailed {
+		t.Fatalf("State = %s, want %s", job.State, JobFailed)
+	}
+	if job.Error == "" {
+		t.Fatal("Error is empty, want fake backend validation detail")
 	}
 }
 
