@@ -5,16 +5,7 @@ Disposable workspaces for developers and AI agents.
 ## Quick Start
 
 ```bash
-# Install
-go install github.com/mcintosh1776/workcell/cmd/workcell@latest
-
-# Run a test job (requires Go build environment)
-go run ./cmd/workcell run --profile fake -- echo hello
-```
-
-Alternatively, build and run from source:
-
-```bash
+# Build and run from source (current implementation)
 git clone https://github.com/mcintosh1776/workcell.git
 cd workcell
 go build -o workcell ./cmd/workcell
@@ -22,7 +13,7 @@ go build -o workcell ./cmd/workcell
 ```
 
 > [!WARNING]
-> The examples above use a `fake` profile for testing. In production, avoid running arbitrary commands in disposable workspaces without proper validation and security considerations. The fake profile is intended for development and testing only.
+> The example above uses a `fake` profile for testing. In production, avoid running arbitrary commands in disposable workspaces without proper validation and security considerations. The fake profile is intended for development and testing only.
 
 See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
 

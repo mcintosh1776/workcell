@@ -29,4 +29,11 @@ func TestQuickStartExamples(t *testing.T) {
 	if job.Cleanup.State != "complete" {
 		t.Errorf("Expected cleanup complete, got '%s'", job.Cleanup.State)
 	}
+	
+	// Validate actual output content from the echo command
+	expectedOutput := "hello
+"
+	if job.Output != expectedOutput {
+		t.Errorf("Expected output %q, got %q", expectedOutput, job.Output)
+	}
 }
