@@ -2,7 +2,7 @@
 
 Disposable workspaces for developers and AI agents.
 
-**Status: Active Development**
+This repository is used for small Workcell automation smoke tests.
 
 ## Quick Start
 
