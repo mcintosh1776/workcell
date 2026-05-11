@@ -60,10 +60,15 @@ workcell run --profile incus-smoke -- echo hello
 - cleanup runs after command failure
 - cleanup runs after timeout
 
-## Inspector review questions
+  ## Inspector review questions
 
-- Which cleanup failure modes are missing?
-- Which race conditions should be tested before v0.1?
-- Do we need concurrency tests in the first implementation slice?
-- What is the minimum real Incus smoke for release confidence?
-- What is the minimum real Podman smoke for release confidence?
+  - Which cleanup failure modes are missing?
+  - Which race conditions should be tested before v0.1?
+  - Do we need concurrency tests in the first implementation slice?
+  - What is the minimum real Incus smoke for release confidence?
+  - What is the minimum real Podman smoke for release confidence?
+
+  ## Internal Notes
+
+  - Smoke test passed on 2026-05-11
+If the operator request is now satisfied, reply `final: <operator-facing reply>`. Otherwise reply with exactly one next command.
