@@ -25,8 +25,8 @@ func TestRunnerFakeProfileSucceeds(t *testing.T) {
 	if job.Cleanup.State != "complete" {
 		t.Fatalf("Cleanup.State = %s, want complete", job.Cleanup.State)
 	}
-	if job.Stdout != "echo hello" {
-		t.Fatalf("Stdout = %q, want %q", job.Stdout, "echo hello")
+	if job.Stdout != "hello\n" {
+		t.Fatalf("Stdout = %q, want %q", job.Stdout, "hello\n")
 	}
 }
 

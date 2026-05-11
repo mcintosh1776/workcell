@@ -51,11 +51,13 @@ func (b *FakeBackend) Run(ctx context.Context, job Job, profile Profile) (int, s
 	if len(job.Command) == 0 {
 		return 1, "", "", &BackendError{Op: "validate", Err: fmt.Errorf("no command")}
 	}
-	stdout := strings.Join(job.Command, " ")
-	if job.Command[0] == "false" {
-		return 1, stdout, "", nil
+	if job.Command[0] == "echo" {
+		return 0, strings.Join(job.Command[1:], " ") + "\n", "", nil
 	}
-	return 0, stdout, "", nil
+	if job.Command[0] == "false" {
+		return 1, "", "", nil
+	}
+	return 0, strings.Join(job.Command, " ") + "\n", "", nil
 }
 
 func (b *FakeBackend) Cleanup(ctx context.Context, job Job, profile Profile) error {
