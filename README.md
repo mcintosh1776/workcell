@@ -2,6 +2,25 @@
 
 Disposable workspaces for developers and AI agents.
 
+## Quick Start
+
+```bash
+# Build and run from source with the deterministic fake profile
+git clone https://github.com/mcintosh1776/workcell.git
+cd workcell
+go build -o workcell ./cmd/workcell
+./workcell run --profile fake -- echo hello
+```
+
+> [!WARNING]
+> The example above uses the `fake` profile for development smoke tests only.
+> The fake profile is deterministic scaffolding. It does not spawn a process,
+> shell, container, or VM. It returns simulated output derived from the submitted
+> command text so the CLI, job model, output capture, and cleanup contract can be
+> tested before Podman or Incus execution is enabled.
+
+See [BUILD.md](BUILD.md) for local build and [docs/lab-host-bootstrap.md](docs/lab-host-bootstrap.md) for deployment.
+
 Workcell is a self-hosted execution runner for clean, repeatable command runs on
 your own build machine. It is Incus-first for machine-like workspaces and also
 supports Podman for fast container checks.
@@ -66,8 +85,9 @@ Current bot handoffs live under [docs/bot-handoffs](docs/bot-handoffs).
 ## Current development baseline
 
 Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,
-which exists to prove the job model, command validation, API shape, and test
-harness before Podman or Incus are wired in.
+which exists to prove the job model, command validation, API shape, output
+capture, and test harness before Podman or Incus are wired in. The fake backend
+is deterministic scaffolding; it is not a real command execution backend.
 
 The repository also serves as a small end-to-end smoke target for the Steve,
 QA, and Sentinel bot review workflow.

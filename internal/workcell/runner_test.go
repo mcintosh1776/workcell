@@ -3,6 +3,7 @@ package workcell
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -24,6 +25,12 @@ func TestRunnerFakeProfileSucceeds(t *testing.T) {
 	}
 	if job.Cleanup.State != "complete" {
 		t.Fatalf("Cleanup.State = %s, want complete", job.Cleanup.State)
+	}
+	if job.Error != "" {
+		t.Fatalf("Error = %q, want empty for successful fake job", job.Error)
+	}
+	if job.Stdout != "echo hello" {
+		t.Fatalf("Stdout = %q, want %q", job.Stdout, "echo hello")
 	}
 }
 
@@ -66,6 +73,12 @@ func TestRunnerFakeProfileCanFail(t *testing.T) {
 	if job.ExitCode != 1 {
 		t.Fatalf("ExitCode = %d, want 1", job.ExitCode)
 	}
+	if job.Stdout != "false" {
+		t.Fatalf("Stdout = %q, want %q", job.Stdout, "false")
+	}
+	if job.Error != "" {
+		t.Fatalf("Error = %q, want empty for command exit failure", job.Error)
+	}
 }
 
 func TestRunnerBackendFailurePreservesBackendExitAndError(t *testing.T) {
@@ -104,8 +117,17 @@ func TestRunnerBackendFailurePreservesBackendExitAndError(t *testing.T) {
 	if job.Error == "" {
 		t.Fatal("Error is empty, want backend failure detail")
 	}
+	if !strings.Contains(job.Error, "image pull failed") {
+		t.Fatalf("Error = %q, want backend failure detail", job.Error)
+	}
+	if job.Stdout != "" {
+		t.Fatalf("Stdout = %q, want empty stdout for backend failure", job.Stdout)
+	}
 	if job.Logs.StderrBytes == 0 {
 		t.Fatal("StderrBytes = 0, want captured backend stderr")
+	}
+	if job.Stderr != "image pull failed" {
+		t.Fatalf("Stderr = %q, want backend stderr detail", job.Stderr)
 	}
 }
 

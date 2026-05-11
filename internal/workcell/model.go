@@ -49,6 +49,8 @@ type Job struct {
 	FinishedAt time.Time    `json:"finishedAt"`
 	Cleanup    CleanupState `json:"cleanup"`
 	Logs       LogSummary   `json:"logs"`
+	Stdout     string       `json:"stdout,omitempty"`
+	Stderr     string       `json:"stderr,omitempty"`
 	Artifacts  ArtifactInfo `json:"artifacts"`
 	// Error contains backend infrastructure error details, if any.
 	// This is distinct from ExitCode which indicates command failure.
