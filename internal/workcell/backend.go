@@ -57,7 +57,10 @@ func (b *FakeBackend) Run(ctx context.Context, job Job, profile Profile) (int, s
 	if job.Command[0] == "false" {
 		return 1, "", "", nil
 	}
-	return 0, strings.Join(job.Command, " ") + "\n", "", nil
+	return 1, "", "", &BackendError{
+		Op:  "validate",
+		Err: fmt.Errorf("fake backend only supports deterministic echo and false commands"),
+	}
 }
 
 func (b *FakeBackend) Cleanup(ctx context.Context, job Job, profile Profile) error {

@@ -50,6 +50,12 @@ func TestFakeBackend_Run(t *testing.T) {
 			wantErr:        true,
 			wantBackendErr: true,
 		},
+		{
+			name:           "unsupported command errors",
+			command:        []string{"date"},
+			wantErr:        true,
+			wantBackendErr: true,
+		},
 	}
 
 	for _, tt := range tests {
