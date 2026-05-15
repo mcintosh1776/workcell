@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -129,6 +130,9 @@ func serve(args []string) error {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": logs})
 	})
 	mux.HandleFunc("POST /v1/validation-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if !authorizeValidationJob(w, r) {
+			return
+		}
 		var request workcell.ValidationWorkerRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
@@ -142,6 +146,9 @@ func serve(args []string) error {
 		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": result})
 	})
 	mux.HandleFunc("GET /v1/validation-jobs/{validationJobId}", func(w http.ResponseWriter, r *http.Request) {
+		if !authorizeValidationJob(w, r) {
+			return
+		}
 		result, ok := runner.ValidationResult(r.PathValue("validationJobId"))
 		if !ok {
 			writeError(w, http.StatusNotFound, "validation_job_not_found", "validation job not found")
@@ -157,6 +164,24 @@ func serve(args []string) error {
 	}
 	slog.Info("workcell listening", "addr", *addr)
 	return server.ListenAndServe()
+}
+
+func authorizeValidationJob(w http.ResponseWriter, r *http.Request) bool {
+	token := strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN"))
+	if token == "" {
+		writeError(w, http.StatusServiceUnavailable, "validation_api_not_configured", "validation job API token is not configured")
+		return false
+	}
+	header := strings.TrimSpace(r.Header.Get("authorization"))
+	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "authorization bearer token is required")
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(header[len("Bearer "):])), []byte(token)) != 1 {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "authorization bearer token is invalid")
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

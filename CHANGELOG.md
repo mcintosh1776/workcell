@@ -11,3 +11,4 @@
   results.
 - Require explicit trusted-local opt-in for synchronous validation command
   execution and require `sourceBundleSha256` for git-bundle validation jobs.
+- Require a configured bearer token for validation job HTTP endpoints.

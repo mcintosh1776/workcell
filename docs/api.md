@@ -108,6 +108,9 @@ trusted local daemon use while the isolated backend matures.
 Local command execution is disabled by default. Operators must set
 `WORKCELL_ENABLE_LOCAL_VALIDATION_EXECUTION=1` only for trusted local daemon
 deployments until validation jobs run under an isolated backend profile.
+The HTTP validation job endpoints also fail closed unless
+`WORKCELL_VALIDATION_API_TOKEN` is configured and the caller sends
+`Authorization: Bearer <token>`.
 
 When `sourceTransport` is `git-bundle`, `sourceBundlePath` must point at a git
 bundle visible to the Workcell daemon, and `sourceBundleSha256` is required.
