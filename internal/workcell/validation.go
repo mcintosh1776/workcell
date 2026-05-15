@@ -18,6 +18,7 @@ import (
 const (
 	validationWorkerBackend = "workcell"
 	defaultValidationPath   = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	localValidationEnv      = "WORKCELL_ENABLE_LOCAL_VALIDATION_EXECUTION"
 )
 
 type ValidationStatus string
@@ -81,6 +82,9 @@ type ValidationWorkerResult struct {
 func (runner *Runner) RunValidation(ctx context.Context, request ValidationWorkerRequest) (ValidationWorkerResult, error) {
 	if err := validateValidationRequest(request); err != nil {
 		return ValidationWorkerResult{}, err
+	}
+	if !localValidationExecutionEnabled() {
+		return ValidationWorkerResult{}, fmt.Errorf("%w: local validation execution is disabled; set %s=1 only for trusted local daemon deployments", ErrInvalidValidation, localValidationEnv)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(request.TimeoutSeconds)*time.Second)
@@ -301,6 +305,9 @@ func validateValidationRequest(request ValidationWorkerRequest) error {
 	if request.SourceBundlePath != "" && request.SourceTransport != "" && request.SourceTransport != "git-bundle" {
 		return fmt.Errorf("%w: sourceTransport must be git-bundle when sourceBundlePath is set", ErrInvalidValidation)
 	}
+	if request.SourceBundlePath != "" && strings.TrimSpace(request.SourceBundleSHA) == "" {
+		return fmt.Errorf("%w: sourceBundleSha256 is required when sourceBundlePath is set", ErrInvalidValidation)
+	}
 	workingDirectory := strings.TrimSpace(request.WorkingDirectory)
 	if filepath.IsAbs(workingDirectory) || containsParentPath(workingDirectory) {
 		return fmt.Errorf("%w: workingDirectory is unsafe", ErrInvalidValidation)
@@ -419,4 +426,9 @@ func validationPath() string {
 		return path
 	}
 	return defaultValidationPath
+}
+
+func localValidationExecutionEnabled() bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(localValidationEnv)))
+	return value == "1" || value == "true" || value == "yes"
 }

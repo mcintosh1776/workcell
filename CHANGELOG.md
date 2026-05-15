@@ -9,3 +9,5 @@
 - Add synchronous validation job API support for git-bundle source handoffs,
   command execution, dirty tracked file detection, and stored validation
   results.
+- Require explicit trusted-local opt-in for synchronous validation command
+  execution and require `sourceBundleSha256` for git-bundle validation jobs.

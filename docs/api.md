@@ -105,11 +105,15 @@ by callers that need a clean checkout, a profile name, a command list, and a
 readiness result. The first implementation is synchronous and intended for
 trusted local daemon use while the isolated backend matures.
 
+Local command execution is disabled by default. Operators must set
+`WORKCELL_ENABLE_LOCAL_VALIDATION_EXECUTION=1` only for trusted local daemon
+deployments until validation jobs run under an isolated backend profile.
+
 When `sourceTransport` is `git-bundle`, `sourceBundlePath` must point at a git
-bundle visible to the Workcell daemon. `sourceBundleSha256` is optional but is
-verified when supplied. Workcell clones the bundle into a job-local workspace,
-checks out `headSha`, runs each command from `workingDirectory` or the checkout
-root, and fails the validation if tracked files are left dirty.
+bundle visible to the Workcell daemon, and `sourceBundleSha256` is required.
+Workcell verifies the digest before cloning the bundle into a job-local
+workspace, checks out `headSha`, runs each command from `workingDirectory` or
+the checkout root, and fails the validation if tracked files are left dirty.
 
 ```json
 {

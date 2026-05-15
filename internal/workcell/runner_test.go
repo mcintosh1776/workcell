@@ -226,6 +226,7 @@ func TestRunnerCleanupUsesFreshContextAfterRunContextExpires(t *testing.T) {
 
 func TestRunnerValidationJobUsesSourceBundle(t *testing.T) {
 	requireValidationCommands(t)
+	t.Setenv(localValidationEnv, "1")
 	repoDir, bundlePath, bundleSHA, headSHA := createValidationBundle(t)
 	runner := NewRunner(DefaultProfiles())
 
@@ -272,6 +273,7 @@ func TestRunnerValidationJobUsesSourceBundle(t *testing.T) {
 
 func TestRunnerValidationJobFailsOnDirtyTrackedFiles(t *testing.T) {
 	requireValidationCommands(t)
+	t.Setenv(localValidationEnv, "1")
 	repoDir, bundlePath, bundleSHA, headSHA := createValidationBundle(t)
 	runner := NewRunner(DefaultProfiles())
 
@@ -304,6 +306,7 @@ func TestRunnerValidationJobFailsOnDirtyTrackedFiles(t *testing.T) {
 
 func TestRunnerValidationJobBlocksOnBadBundleDigest(t *testing.T) {
 	requireValidationCommands(t)
+	t.Setenv(localValidationEnv, "1")
 	repoDir, bundlePath, _, headSHA := createValidationBundle(t)
 	runner := NewRunner(DefaultProfiles())
 
@@ -331,6 +334,58 @@ func TestRunnerValidationJobBlocksOnBadBundleDigest(t *testing.T) {
 	}
 	if result.Summary != "sourceBundleSha256 mismatch" {
 		t.Fatalf("Summary = %q, want digest mismatch", result.Summary)
+	}
+}
+
+func TestRunnerValidationJobRequiresExplicitLocalExecutionOptIn(t *testing.T) {
+	requireValidationCommands(t)
+	repoDir, bundlePath, bundleSHA, headSHA := createValidationBundle(t)
+	runner := NewRunner(DefaultProfiles())
+
+	_, err := runner.RunValidation(context.Background(), ValidationWorkerRequest{
+		ValidationJobID:   "validation-disabled",
+		Repository:        "example/workcell",
+		RepoURL:           repoDir,
+		BaseRef:           "HEAD",
+		HeadRef:           "HEAD",
+		HeadSHA:           headSHA,
+		ValidationProfile: "unit",
+		Commands:          []string{"test -f README.md"},
+		TimeoutSeconds:    30,
+		NetworkPolicy:     "disabled",
+		Mutation:          "none",
+		SourceTransport:   "git-bundle",
+		SourceBundlePath:  bundlePath,
+		SourceBundleSHA:   bundleSHA,
+	})
+	if !errors.Is(err, ErrInvalidValidation) {
+		t.Fatalf("error = %v, want ErrInvalidValidation", err)
+	}
+}
+
+func TestRunnerValidationJobRequiresBundleDigest(t *testing.T) {
+	requireValidationCommands(t)
+	t.Setenv(localValidationEnv, "1")
+	repoDir, bundlePath, _, headSHA := createValidationBundle(t)
+	runner := NewRunner(DefaultProfiles())
+
+	_, err := runner.RunValidation(context.Background(), ValidationWorkerRequest{
+		ValidationJobID:   "validation-missing-digest",
+		Repository:        "example/workcell",
+		RepoURL:           repoDir,
+		BaseRef:           "HEAD",
+		HeadRef:           "HEAD",
+		HeadSHA:           headSHA,
+		ValidationProfile: "unit",
+		Commands:          []string{"test -f README.md"},
+		TimeoutSeconds:    30,
+		NetworkPolicy:     "disabled",
+		Mutation:          "none",
+		SourceTransport:   "git-bundle",
+		SourceBundlePath:  bundlePath,
+	})
+	if !errors.Is(err, ErrInvalidValidation) {
+		t.Fatalf("error = %v, want ErrInvalidValidation", err)
 	}
 }
 
