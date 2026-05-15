@@ -16,3 +16,5 @@
   storage.
 - Document validation API token-file ownership, placement, provisioning,
   workspace isolation, and rotation requirements.
+- Enforce validation API token files as regular owner-only permission files
+  before reading their contents.

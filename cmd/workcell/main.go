@@ -189,6 +189,10 @@ func validationAPIToken() string {
 	if tokenFile == "" {
 		return ""
 	}
+	info, err := os.Stat(tokenFile)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return ""
+	}
 	data, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return ""

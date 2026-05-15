@@ -115,7 +115,8 @@ caller sends `Authorization: Bearer <token>`.
 Validation API token file requirements:
 
 - keep the token file outside the repository and outside job workspaces
-- make it readable only by the Workcell daemon user, for example mode `0600`
+- make it a regular file readable only by the Workcell daemon user; Workcell
+  rejects token files with group or other permissions
 - provision it through the host's secret manager or systemd credential flow
 - never mount or copy it into validation job workspaces
 - rotate it when daemon access is changed or suspected compromised

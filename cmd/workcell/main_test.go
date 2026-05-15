@@ -80,3 +80,24 @@ func TestAuthorizeValidationJobFailsClosedForMissingTokenFile(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
 	}
 }
+
+func TestAuthorizeValidationJobFailsClosedForPermissiveTokenFile(t *testing.T) {
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("file-token\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(tokenFile, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer file-token")
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true for permissive token file")
+	}
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
