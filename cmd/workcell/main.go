@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -109,6 +110,9 @@ func serve(args []string) error {
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": job})
 	})
+	mux.HandleFunc("GET /v1/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": runner.List()})
+	})
 	mux.HandleFunc("GET /v1/jobs/{jobId}", func(w http.ResponseWriter, r *http.Request) {
 		job, ok := runner.Get(r.PathValue("jobId"))
 		if !ok {
@@ -116,6 +120,41 @@ func serve(args []string) error {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": job})
+	})
+	mux.HandleFunc("GET /v1/jobs/{jobId}/logs", func(w http.ResponseWriter, r *http.Request) {
+		logs, ok := runner.Logs(r.PathValue("jobId"))
+		if !ok {
+			writeError(w, http.StatusNotFound, "job_not_found", "job not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": logs})
+	})
+	mux.HandleFunc("POST /v1/validation-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if !authorizeValidationJob(w, r) {
+			return
+		}
+		var request workcell.ValidationWorkerRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
+			return
+		}
+		result, err := runner.RunValidation(r.Context(), request)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, workcell.ErrorCode(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": result})
+	})
+	mux.HandleFunc("GET /v1/validation-jobs/{validationJobId}", func(w http.ResponseWriter, r *http.Request) {
+		if !authorizeValidationJob(w, r) {
+			return
+		}
+		result, ok := runner.ValidationResult(r.PathValue("validationJobId"))
+		if !ok {
+			writeError(w, http.StatusNotFound, "validation_job_not_found", "validation job not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
 	})
 
 	server := &http.Server{
@@ -125,6 +164,40 @@ func serve(args []string) error {
 	}
 	slog.Info("workcell listening", "addr", *addr)
 	return server.ListenAndServe()
+}
+
+func authorizeValidationJob(w http.ResponseWriter, r *http.Request) bool {
+	token := validationAPIToken()
+	if token == "" {
+		writeError(w, http.StatusServiceUnavailable, "validation_api_not_configured", "validation job API token is not configured")
+		return false
+	}
+	header := strings.TrimSpace(r.Header.Get("authorization"))
+	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "authorization bearer token is required")
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(header[len("Bearer "):])), []byte(token)) != 1 {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "authorization bearer token is invalid")
+		return false
+	}
+	return true
+}
+
+func validationAPIToken() string {
+	tokenFile := strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN_FILE"))
+	if tokenFile == "" {
+		return ""
+	}
+	info, err := os.Stat(tokenFile)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		return ""
+	}
+	data, err := os.ReadFile(tokenFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

@@ -1,0 +1,103 @@
+package main
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+)
+
+func TestAuthorizeValidationJobFailsClosedWithoutConfiguredToken(t *testing.T) {
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN", "")
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true without configured token")
+	}
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestAuthorizeValidationJobRequiresBearerToken(t *testing.T) {
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("secret-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true without bearer token")
+	}
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestAuthorizeValidationJobAcceptsConfiguredBearerToken(t *testing.T) {
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("secret-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer secret-token")
+	response := httptest.NewRecorder()
+
+	if !authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned false for configured bearer token")
+	}
+}
+
+func TestAuthorizeValidationJobPrefersTokenFile(t *testing.T) {
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer file-token")
+	response := httptest.NewRecorder()
+
+	if !authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned false for configured token file")
+	}
+}
+
+func TestAuthorizeValidationJobFailsClosedForMissingTokenFile(t *testing.T) {
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", t.TempDir()+"/missing-token")
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer anything")
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true for missing token file")
+	}
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestAuthorizeValidationJobFailsClosedForPermissiveTokenFile(t *testing.T) {
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("file-token\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(tokenFile, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer file-token")
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true for permissive token file")
+	}
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}

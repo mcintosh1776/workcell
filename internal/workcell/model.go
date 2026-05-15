@@ -67,14 +67,22 @@ type CleanupState struct {
 
 // LogSummary provides a summary of job logs.
 type LogSummary struct {
-	StdoutBytes int `json:"stdoutBytes"`
-	StderrBytes int `json:"stderrBytes"`
+	StdoutBytes int  `json:"stdoutBytes"`
+	StderrBytes int  `json:"stderrBytes"`
+	Truncated   bool `json:"truncated"`
 }
 
 // ArtifactInfo provides information about collected artifacts.
 type ArtifactInfo struct {
 	Count int `json:"count"`
 	Bytes int `json:"bytes"`
+}
+
+// JobLogs contains bounded captured logs for a completed job.
+type JobLogs struct {
+	Stdout    string `json:"stdout"`
+	Stderr    string `json:"stderr"`
+	Truncated bool   `json:"truncated"`
 }
 
 // Profile defines a job execution profile.
