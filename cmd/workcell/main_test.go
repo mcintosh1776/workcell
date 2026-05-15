@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -40,5 +41,21 @@ func TestAuthorizeValidationJobAcceptsConfiguredBearerToken(t *testing.T) {
 
 	if !authorizeValidationJob(response, request) {
 		t.Fatal("authorizeValidationJob returned false for configured bearer token")
+	}
+}
+
+func TestAuthorizeValidationJobPrefersTokenFile(t *testing.T) {
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN", "wrong-token")
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer file-token")
+	response := httptest.NewRecorder()
+
+	if !authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned false for configured token file")
 	}
 }

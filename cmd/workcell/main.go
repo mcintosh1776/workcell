@@ -167,7 +167,7 @@ func serve(args []string) error {
 }
 
 func authorizeValidationJob(w http.ResponseWriter, r *http.Request) bool {
-	token := strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN"))
+	token := validationAPIToken()
 	if token == "" {
 		writeError(w, http.StatusServiceUnavailable, "validation_api_not_configured", "validation job API token is not configured")
 		return false
@@ -182,6 +182,18 @@ func authorizeValidationJob(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func validationAPIToken() string {
+	tokenFile := strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN_FILE"))
+	if tokenFile != "" {
+		data, err := os.ReadFile(tokenFile)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(data))
+	}
+	return strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN"))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
