@@ -112,6 +112,14 @@ The HTTP validation job endpoints also fail closed unless
 `WORKCELL_VALIDATION_API_TOKEN_FILE` points at a readable token file and the
 caller sends `Authorization: Bearer <token>`.
 
+Validation API token file requirements:
+
+- keep the token file outside the repository and outside job workspaces
+- make it readable only by the Workcell daemon user, for example mode `0600`
+- provision it through the host's secret manager or systemd credential flow
+- never mount or copy it into validation job workspaces
+- rotate it when daemon access is changed or suspected compromised
+
 When `sourceTransport` is `git-bundle`, `sourceBundlePath` must point at a git
 bundle visible to the Workcell daemon, and `sourceBundleSha256` is required.
 Workcell verifies the digest before cloning the bundle into a job-local

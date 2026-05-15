@@ -14,3 +14,5 @@
 - Require a configured bearer token for validation job HTTP endpoints, preferring
   `WORKCELL_VALIDATION_API_TOKEN_FILE` instead of direct environment-token
   storage.
+- Document validation API token-file ownership, placement, provisioning,
+  workspace isolation, and rotation requirements.
