@@ -110,8 +110,7 @@ Local command execution is disabled by default. Operators must set
 deployments until validation jobs run under an isolated backend profile.
 The HTTP validation job endpoints also fail closed unless
 `WORKCELL_VALIDATION_API_TOKEN_FILE` points at a readable token file and the
-caller sends `Authorization: Bearer <token>`. `WORKCELL_VALIDATION_API_TOKEN`
-is accepted as a local-development fallback when no token file is configured.
+caller sends `Authorization: Bearer <token>`.
 
 When `sourceTransport` is `git-bundle`, `sourceBundlePath` must point at a git
 bundle visible to the Workcell daemon, and `sourceBundleSha256` is required.

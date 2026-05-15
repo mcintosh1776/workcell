@@ -12,4 +12,5 @@
 - Require explicit trusted-local opt-in for synchronous validation command
   execution and require `sourceBundleSha256` for git-bundle validation jobs.
 - Require a configured bearer token for validation job HTTP endpoints, preferring
-  `WORKCELL_VALIDATION_API_TOKEN_FILE` over direct environment-token storage.
+  `WORKCELL_VALIDATION_API_TOKEN_FILE` instead of direct environment-token
+  storage.

@@ -186,14 +186,14 @@ func authorizeValidationJob(w http.ResponseWriter, r *http.Request) bool {
 
 func validationAPIToken() string {
 	tokenFile := strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN_FILE"))
-	if tokenFile != "" {
-		data, err := os.ReadFile(tokenFile)
-		if err != nil {
-			return ""
-		}
-		return strings.TrimSpace(string(data))
+	if tokenFile == "" {
+		return ""
 	}
-	return strings.TrimSpace(os.Getenv("WORKCELL_VALIDATION_API_TOKEN"))
+	data, err := os.ReadFile(tokenFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

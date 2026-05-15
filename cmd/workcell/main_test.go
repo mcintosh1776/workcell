@@ -21,7 +21,11 @@ func TestAuthorizeValidationJobFailsClosedWithoutConfiguredToken(t *testing.T) {
 }
 
 func TestAuthorizeValidationJobRequiresBearerToken(t *testing.T) {
-	t.Setenv("WORKCELL_VALIDATION_API_TOKEN", "secret-token")
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("secret-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
 	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
 	response := httptest.NewRecorder()
 
@@ -34,7 +38,11 @@ func TestAuthorizeValidationJobRequiresBearerToken(t *testing.T) {
 }
 
 func TestAuthorizeValidationJobAcceptsConfiguredBearerToken(t *testing.T) {
-	t.Setenv("WORKCELL_VALIDATION_API_TOKEN", "secret-token")
+	tokenFile := t.TempDir() + "/validation-token"
+	if err := os.WriteFile(tokenFile, []byte("secret-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", tokenFile)
 	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
 	request.Header.Set("authorization", "Bearer secret-token")
 	response := httptest.NewRecorder()
@@ -45,7 +53,6 @@ func TestAuthorizeValidationJobAcceptsConfiguredBearerToken(t *testing.T) {
 }
 
 func TestAuthorizeValidationJobPrefersTokenFile(t *testing.T) {
-	t.Setenv("WORKCELL_VALIDATION_API_TOKEN", "wrong-token")
 	tokenFile := t.TempDir() + "/validation-token"
 	if err := os.WriteFile(tokenFile, []byte("file-token\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -57,5 +64,19 @@ func TestAuthorizeValidationJobPrefersTokenFile(t *testing.T) {
 
 	if !authorizeValidationJob(response, request) {
 		t.Fatal("authorizeValidationJob returned false for configured token file")
+	}
+}
+
+func TestAuthorizeValidationJobFailsClosedForMissingTokenFile(t *testing.T) {
+	t.Setenv("WORKCELL_VALIDATION_API_TOKEN_FILE", t.TempDir()+"/missing-token")
+	request := httptest.NewRequest(http.MethodPost, "/v1/validation-jobs", nil)
+	request.Header.Set("authorization", "Bearer anything")
+	response := httptest.NewRecorder()
+
+	if authorizeValidationJob(response, request) {
+		t.Fatal("authorizeValidationJob returned true for missing token file")
+	}
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
 	}
 }
