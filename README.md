@@ -84,10 +84,12 @@ Current bot handoffs live under [docs/bot-handoffs](docs/bot-handoffs).
 
 ## Current development baseline
 
-Workcell is a Go CLI/daemon skeleton. The only implemented backend is `fake`,
-which exists to prove the job model, command validation, API shape, output
-capture, and test harness before Podman or Incus are wired in. The fake backend
-is deterministic scaffolding; it is not a real command execution backend.
+Workcell is a Go CLI/daemon skeleton with a synchronous runner API. The `fake`
+backend exists to prove the job model, command validation, API shape, output
+capture, and test harness; it is deterministic scaffolding, not a real command
+execution backend. `podman-smoke` is available for bounded container validation
+on a lab host. Jobs are retained in memory with bounded stdout/stderr retrieval
+through the API.
 
 The repository also serves as a small end-to-end smoke target for the Steve,
 QA, and Sentinel bot review workflow.

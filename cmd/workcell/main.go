@@ -109,6 +109,9 @@ func serve(args []string) error {
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": job})
 	})
+	mux.HandleFunc("GET /v1/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": runner.List()})
+	})
 	mux.HandleFunc("GET /v1/jobs/{jobId}", func(w http.ResponseWriter, r *http.Request) {
 		job, ok := runner.Get(r.PathValue("jobId"))
 		if !ok {
@@ -116,6 +119,35 @@ func serve(args []string) error {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": job})
+	})
+	mux.HandleFunc("GET /v1/jobs/{jobId}/logs", func(w http.ResponseWriter, r *http.Request) {
+		logs, ok := runner.Logs(r.PathValue("jobId"))
+		if !ok {
+			writeError(w, http.StatusNotFound, "job_not_found", "job not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": logs})
+	})
+	mux.HandleFunc("POST /v1/validation-jobs", func(w http.ResponseWriter, r *http.Request) {
+		var request workcell.ValidationWorkerRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_json", err.Error())
+			return
+		}
+		result, err := runner.RunValidation(r.Context(), request)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, workcell.ErrorCode(err), err.Error())
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "data": result})
+	})
+	mux.HandleFunc("GET /v1/validation-jobs/{validationJobId}", func(w http.ResponseWriter, r *http.Request) {
+		result, ok := runner.ValidationResult(r.PathValue("validationJobId"))
+		if !ok {
+			writeError(w, http.StatusNotFound, "validation_job_not_found", "validation job not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "data": result})
 	})
 
 	server := &http.Server{

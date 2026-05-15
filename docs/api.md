@@ -16,6 +16,8 @@ POST /v1/jobs
 GET  /v1/jobs
 GET  /v1/jobs/{jobId}
 GET  /v1/jobs/{jobId}/logs
+POST /v1/validation-jobs
+GET  /v1/validation-jobs/{validationJobId}
 GET  /v1/jobs/{jobId}/artifacts
 POST /v1/jobs/{jobId}/cancel
 POST /v1/admin/cleanup
@@ -88,12 +90,6 @@ Response:
 
 `GET /v1/jobs/{jobId}/logs` returns bounded logs.
 
-Open question for v0.1:
-
-- return combined logs by default, or separate stdout/stderr fields?
-
-Recommended default:
-
 ```json
 {
   "stdout": "...",
@@ -101,6 +97,56 @@ Recommended default:
   "truncated": false
 }
 ```
+
+## Validation jobs
+
+`POST /v1/validation-jobs` accepts the generic validation-worker contract used
+by callers that need a clean checkout, a profile name, a command list, and a
+readiness result. The first implementation is synchronous and intended for
+trusted local daemon use while the isolated backend matures.
+
+When `sourceTransport` is `git-bundle`, `sourceBundlePath` must point at a git
+bundle visible to the Workcell daemon. `sourceBundleSha256` is optional but is
+verified when supplied. Workcell clones the bundle into a job-local workspace,
+checks out `headSha`, runs each command from `workingDirectory` or the checkout
+root, and fails the validation if tracked files are left dirty.
+
+```json
+{
+  "validationJobId": "validation_01hxyz",
+  "repository": "owner/repo",
+  "repoUrl": "https://github.com/owner/repo.git",
+  "baseRef": "main",
+  "headRef": "feature",
+  "headSha": "abc123",
+  "validationProfile": "unit",
+  "commands": ["go test ./..."],
+  "timeoutSeconds": 900,
+  "networkPolicy": "disabled",
+  "mutation": "none",
+  "sourceTransport": "git-bundle",
+  "sourceBundlePath": "/var/lib/workcell/requests/validation_01hxyz.bundle",
+  "sourceBundleSha256": "..."
+}
+```
+
+Response:
+
+```json
+{
+  "validationJobId": "validation_01hxyz",
+  "status": "succeeded",
+  "headSha": "abc123",
+  "validationProfile": "unit",
+  "dirtyTrackedFiles": [],
+  "exitCode": 0,
+  "workerBackend": "workcell",
+  "mutation": "none"
+}
+```
+
+`GET /v1/validation-jobs/{validationJobId}` returns the stored result for a
+completed validation job.
 
 ## Error shape
 
@@ -113,4 +159,3 @@ Recommended default:
   }
 }
 ```
-
