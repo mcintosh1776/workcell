@@ -34,6 +34,12 @@ func main() {
 		}
 	case "profiles":
 		fmt.Println(workcell.ProfileListOutput(workcell.DefaultProfiles()))
+	case "profile":
+		if err := profile(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "workcell: %v
+", err)
+			os.Exit(1)
+		}
 	case "version":
 		fmt.Println(workcell.Version())
 	case "help", "--help", "-h":
@@ -50,7 +56,20 @@ func usage() {
   workcell run --profile fake -- <command> [args...]
   workcell serve [--addr 127.0.0.1:8787]
   workcell profiles
+  workcell profile <id>
   workcell version`)
+}
+
+func profile(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("profile id required")
+	}
+	output, err := workcell.ProfileDetailOutput(workcell.DefaultProfiles(), args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Println(output)
+	return nil
 }
 
 func run(args []string) error {
