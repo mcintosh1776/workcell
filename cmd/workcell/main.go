@@ -33,7 +33,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "version":
-		fmt.Println("workcell dev")
+		fmt.Println(workcell.Version())
 	case "help", "--help", "-h":
 		usage()
 	default:
