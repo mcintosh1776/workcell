@@ -36,8 +36,7 @@ func main() {
 		fmt.Println(workcell.ProfileListOutput(workcell.DefaultProfiles()))
 	case "profile":
 		if err := profile(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v
-", err)
+			fmt.Fprintf(os.Stderr, "workcell: %v"+string([]byte{10}), err)
 			os.Exit(1)
 		}
 	case "version":
