@@ -12,9 +12,7 @@ func TestProfilesCommandOutput(t *testing.T) {
     t.Fatalf("profiles command failed: %v output=%s", err, output)
   }
   got := string(output)
-  want := "fake
-podman-smoke
-"
+  want := "fake" + string(rune(10)) + "podman-smoke" + string(rune(10))
   if got != want {
     t.Fatalf("profiles output = %q, want %q", got, want)
   }
