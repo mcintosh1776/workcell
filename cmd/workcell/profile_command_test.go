@@ -6,6 +6,31 @@ import (
   "testing"
 )
 
+func TestProfilesCommandStillListsDefaults(t *testing.T) {
+  cmd := exec.Command("go", "run", ".", "profiles")
+  output, err := cmd.CombinedOutput()
+  if err != nil {
+    t.Fatalf("profiles command failed: %v output=%s", err, output)
+  }
+  got := string(output)
+  for _, want := range []string{"fake", "podman-smoke"} {
+    if !strings.Contains(got, want) {
+      t.Fatalf("profiles output = %q, missing %q", got, want)
+    }
+  }
+}
+
+func TestHelpIncludesProfileCommand(t *testing.T) {
+  cmd := exec.Command("go", "run", ".", "help")
+  output, err := cmd.CombinedOutput()
+  if err != nil {
+    t.Fatalf("help command failed: %v output=%s", err, output)
+  }
+  if !strings.Contains(string(output), "workcell profile <id>") {
+    t.Fatalf("help output = %q, missing profile command", output)
+  }
+}
+
 func TestProfileCommandOutput(t *testing.T) {
   cmd := exec.Command("go", "run", ".", "profile", "fake")
   output, err := cmd.CombinedOutput()
@@ -17,6 +42,17 @@ func TestProfileCommandOutput(t *testing.T) {
     if !strings.Contains(got, want) {
       t.Fatalf("profile output = %q, missing %q", got, want)
     }
+  }
+}
+
+func TestProfileCommandRejectsMissingProfile(t *testing.T) {
+  cmd := exec.Command("go", "run", ".", "profile")
+  output, err := cmd.CombinedOutput()
+  if err == nil {
+    t.Fatalf("profile missing arg command succeeded unexpectedly: %s", output)
+  }
+  if !strings.Contains(string(output), "profile id required") {
+    t.Fatalf("profile missing arg output = %q, want required message", output)
   }
 }
 
