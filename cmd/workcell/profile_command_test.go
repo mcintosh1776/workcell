@@ -26,7 +26,7 @@ func TestProfileCommandRejectsUnknownProfile(t *testing.T) {
   if err == nil {
     t.Fatalf("profile missing command succeeded unexpectedly: %s", output)
   }
-  if !strings.Contains(string(output), "profile "missing" not found") {
+  if !strings.Contains(string(output), "profile "+string([]byte{34})+"missing"+string([]byte{34})+" not found") {
     t.Fatalf("profile missing output = %q, want not found message", output)
   }
 }
