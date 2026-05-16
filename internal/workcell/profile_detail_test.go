@@ -45,3 +45,24 @@ func TestProfileDetailOutputRejectsEmptyProfile(t *testing.T) {
     t.Fatal("ProfileDetailOutput(empty) error = nil, want error")
   }
 }
+
+func TestProfileDetailOutputRejectsWhitespaceProfile(t *testing.T) {
+  if _, err := ProfileDetailOutput(DefaultProfiles(), "   "); err == nil {
+    t.Fatal("ProfileDetailOutput(whitespace) error = nil, want error")
+  }
+}
+
+func TestProfileDetailOutputRejectsNegativeTimeout(t *testing.T) {
+  profiles := map[string]Profile{
+    "bad-timeout": {
+      ID:      "bad-timeout",
+      Backend: "fake",
+      BackendConfig: BackendConfig{
+        Timeout: -1,
+      },
+    },
+  }
+  if _, err := ProfileDetailOutput(profiles, "bad-timeout"); err == nil {
+    t.Fatal("ProfileDetailOutput(bad-timeout) error = nil, want error")
+  }
+}

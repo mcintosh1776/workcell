@@ -14,6 +14,9 @@ func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string,
   if !ok {
     return "", fmt.Errorf("profile %q not found", profileID)
   }
+  if profile.BackendConfig.Timeout < 0 {
+    return "", fmt.Errorf("profile %q has invalid timeout %d", profileID, profile.BackendConfig.Timeout)
+  }
 
   lines := []string{
     "id: " + profile.ID,
