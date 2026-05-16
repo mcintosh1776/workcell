@@ -33,7 +33,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "profiles":
-		fmt.Println(strings.Join(workcell.SortedProfileIDs(workcell.DefaultProfiles()), string(rune(10))))
+		fmt.Println(strings.Join(workcell.SortedProfileIDs(workcell.DefaultProfiles()), "\n"))
 	case "version":
 		fmt.Println(workcell.Version())
 	case "help", "--help", "-h":
