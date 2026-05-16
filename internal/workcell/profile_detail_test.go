@@ -39,3 +39,9 @@ func TestProfileDetailOutputRejectsUnknownProfile(t *testing.T) {
     t.Fatal("ProfileDetailOutput(missing) error = nil, want error")
   }
 }
+
+func TestProfileDetailOutputRejectsEmptyProfile(t *testing.T) {
+  if _, err := ProfileDetailOutput(DefaultProfiles(), ""); err == nil {
+    t.Fatal("ProfileDetailOutput(empty) error = nil, want error")
+  }
+}

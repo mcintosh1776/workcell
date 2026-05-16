@@ -7,6 +7,9 @@ import (
 
 // ProfileDetailOutput returns one profile's details in deterministic display order.
 func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string, error) {
+  if strings.TrimSpace(profileID) == "" {
+    return "", fmt.Errorf("profile id required")
+  }
   profile, ok := profiles[profileID]
   if !ok {
     return "", fmt.Errorf("profile %q not found", profileID)
@@ -22,5 +25,5 @@ func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string,
   if profile.BackendConfig.Timeout > 0 {
     lines = append(lines, fmt.Sprintf("timeoutSeconds: %d", profile.BackendConfig.Timeout))
   }
-  return strings.Join(lines, string([]byte{10})), nil
+  return strings.Join(lines, fmt.Sprintf("%c", 10)), nil
 }

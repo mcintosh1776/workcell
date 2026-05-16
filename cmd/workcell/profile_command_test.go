@@ -1,6 +1,7 @@
 package main
 
 import (
+  "fmt"
   "os/exec"
   "strings"
   "testing"
@@ -26,7 +27,18 @@ func TestProfileCommandRejectsUnknownProfile(t *testing.T) {
   if err == nil {
     t.Fatalf("profile missing command succeeded unexpectedly: %s", output)
   }
-  if !strings.Contains(string(output), "profile "+string([]byte{34})+"missing"+string([]byte{34})+" not found") {
+  if !strings.Contains(string(output), fmt.Sprintf("profile %q not found", "missing")) {
     t.Fatalf("profile missing output = %q, want not found message", output)
+  }
+}
+
+func TestProfileCommandRejectsEmptyProfile(t *testing.T) {
+  cmd := exec.Command("go", "run", ".", "profile", "")
+  output, err := cmd.CombinedOutput()
+  if err == nil {
+    t.Fatalf("profile empty command succeeded unexpectedly: %s", output)
+  }
+  if !strings.Contains(string(output), "profile id required") {
+    t.Fatalf("profile empty output = %q, want required message", output)
   }
 }

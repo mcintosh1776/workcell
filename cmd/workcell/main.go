@@ -36,7 +36,7 @@ func main() {
 		fmt.Println(workcell.ProfileListOutput(workcell.DefaultProfiles()))
 	case "profile":
 		if err := profile(os.Args[2:]); err != nil {
-			fmt.Fprintf(os.Stderr, "workcell: %v"+string([]byte{10}), err)
+			fmt.Fprintf(os.Stderr, "workcell: %v%c", err, 10)
 			os.Exit(1)
 		}
 	case "version":
@@ -60,7 +60,7 @@ func usage() {
 }
 
 func profile(args []string) error {
-	if len(args) != 1 {
+	if len(args) != 1 || strings.TrimSpace(args[0]) == "" {
 		return fmt.Errorf("profile id required")
 	}
 	output, err := workcell.ProfileDetailOutput(workcell.DefaultProfiles(), args[0])
