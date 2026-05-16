@@ -32,6 +32,9 @@ func main() {
 			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
+	case "profiles":
+		fmt.Println(strings.Join(workcell.SortedProfileIDs(workcell.DefaultProfiles()), "
+"))
 	case "version":
 		fmt.Println(workcell.Version())
 	case "help", "--help", "-h":
