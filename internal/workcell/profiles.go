@@ -1,6 +1,9 @@
 package workcell
 
-import "sort"
+import (
+  "sort"
+  "strings"
+)
 
 // SortedProfileIDs returns profile IDs in deterministic display order.
 func SortedProfileIDs(profiles map[string]Profile) []string {
@@ -10,4 +13,9 @@ func SortedProfileIDs(profiles map[string]Profile) []string {
   }
   sort.Strings(ids)
   return ids
+}
+
+// ProfileListOutput returns profile IDs formatted for CLI output.
+func ProfileListOutput(profiles map[string]Profile) string {
+  return strings.Join(SortedProfileIDs(profiles), "\n")
 }
