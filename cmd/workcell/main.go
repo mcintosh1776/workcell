@@ -32,6 +32,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}
+	case "profiles":
+		fmt.Println(workcell.ProfileListOutput(workcell.DefaultProfiles()))
 	case "version":
 		fmt.Println(workcell.Version())
 	case "help", "--help", "-h":
@@ -47,6 +49,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
   workcell run --profile fake -- <command> [args...]
   workcell serve [--addr 127.0.0.1:8787]
+  workcell profiles
   workcell version`)
 }
 
