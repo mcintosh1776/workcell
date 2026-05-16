@@ -1,7 +1,6 @@
 package main
 
 import (
-  "fmt"
   "os/exec"
   "strings"
   "testing"
@@ -27,7 +26,7 @@ func TestProfileCommandRejectsUnknownProfile(t *testing.T) {
   if err == nil {
     t.Fatalf("profile missing command succeeded unexpectedly: %s", output)
   }
-  if !strings.Contains(string(output), fmt.Sprintf("profile %q not found", "missing")) {
+  if !strings.Contains(string(output), "profile \"missing\" not found") {
     t.Fatalf("profile missing output = %q, want not found message", output)
   }
 }

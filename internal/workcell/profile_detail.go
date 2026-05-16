@@ -28,5 +28,5 @@ func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string,
   if profile.BackendConfig.Timeout > 0 {
     lines = append(lines, fmt.Sprintf("timeoutSeconds: %d", profile.BackendConfig.Timeout))
   }
-  return strings.Join(lines, fmt.Sprintf("%c", 10)), nil
+  return strings.Join(lines, "\n"), nil
 }
