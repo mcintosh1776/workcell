@@ -47,6 +47,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
   workcell run --profile fake -- <command> [args...]
   workcell serve [--addr 127.0.0.1:8787]
+  workcell profiles
   workcell version`)
 }
 
