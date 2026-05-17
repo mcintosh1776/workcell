@@ -78,6 +78,17 @@ func TestProfileCommandRejectsEmptyProfile(t *testing.T) {
   }
 }
 
+func TestProfileCommandRejectsExtraArgs(t *testing.T) {
+  cmd := exec.Command("go", "run", ".", "profile", "fake", "extra")
+  output, err := cmd.CombinedOutput()
+  if err == nil {
+    t.Fatalf("profile extra arg command succeeded unexpectedly: %s", output)
+  }
+  if !strings.Contains(string(output), "profile id required") {
+    t.Fatalf("profile extra arg output = %q, want required message", output)
+  }
+}
+
 func TestProfileCommandRejectsWhitespaceProfile(t *testing.T) {
   cmd := exec.Command("go", "run", ".", "profile", "   ")
   output, err := cmd.CombinedOutput()
