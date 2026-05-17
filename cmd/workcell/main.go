@@ -35,7 +35,11 @@ func main() {
 	case "profiles":
 		fmt.Println(workcell.ProfileListOutput(workcell.DefaultProfiles()))
 	case "profile":
-		if err := profile(os.Args[2:]); err != nil {
+		profileArgs := []string{}
+if len(os.Args) > 2 {
+	profileArgs = os.Args[2:]
+}
+if err := profile(profileArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "workcell: %v\n", err)
 			os.Exit(1)
 		}

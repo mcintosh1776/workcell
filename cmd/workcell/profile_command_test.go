@@ -45,7 +45,7 @@ func TestProfileCommandOutput(t *testing.T) {
   }
 }
 
-func TestProfileCommandRejectsMissingProfile(t *testing.T) {
+func TestProfileCommandWithInsufficientArgs(t *testing.T) {
   cmd := exec.Command("go", "run", ".", "profile")
   output, err := cmd.CombinedOutput()
   if err == nil {
