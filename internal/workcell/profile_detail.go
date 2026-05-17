@@ -7,8 +7,12 @@ import (
 
 // ProfileDetailOutput returns one profile's details in deterministic display order.
 func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string, error) {
-  if strings.TrimSpace(profileID) == "" {
+  profileID = strings.TrimSpace(profileID)
+  if profileID == "" {
     return "", fmt.Errorf("profile id required")
+  }
+  if !validProfileID(profileID) {
+    return "", fmt.Errorf("profile %q is invalid", profileID)
   }
   profile, ok := profiles[profileID]
   if !ok {
@@ -29,4 +33,23 @@ func ProfileDetailOutput(profiles map[string]Profile, profileID string) (string,
     lines = append(lines, fmt.Sprintf("timeoutSeconds: %d", profile.BackendConfig.Timeout))
   }
   return strings.Join(lines, "\n"), nil
+}
+
+func validProfileID(profileID string) bool {
+  for _, ch := range profileID {
+    if ch >= 'a' && ch <= 'z' {
+      continue
+    }
+    if ch >= 'A' && ch <= 'Z' {
+      continue
+    }
+    if ch >= '0' && ch <= '9' {
+      continue
+    }
+    if ch == '-' || ch == '_' {
+      continue
+    }
+    return false
+  }
+  return true
 }

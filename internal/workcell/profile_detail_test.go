@@ -52,6 +52,14 @@ func TestProfileDetailOutputRejectsWhitespaceProfile(t *testing.T) {
   }
 }
 
+func TestProfileDetailOutputRejectsInvalidProfileID(t *testing.T) {
+  for _, profileID := range []string{"../fake", "fake/path", "bad profile", "bad\nprofile"} {
+    if _, err := ProfileDetailOutput(DefaultProfiles(), profileID); err == nil {
+      t.Fatalf("ProfileDetailOutput(%q) error = nil, want error", profileID)
+    }
+  }
+}
+
 func TestProfileDetailOutputRejectsNegativeTimeout(t *testing.T) {
   profiles := map[string]Profile{
     "bad-timeout": {
